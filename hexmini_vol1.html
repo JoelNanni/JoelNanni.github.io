@@ -1,0 +1,1625 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>HexaCross Puzzle Interface</title>
+    <style>
+        body {
+            font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+            background-color: #222;
+            color: #fff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+            margin: 0;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        h1 { margin: 5px 0; font-size: 24px; }
+        #puzzle-id-banner { font-size: 14px; color: #aaa; margin-bottom: 8px; font-weight: bold; }
+
+        /* --- SPLASH LAUNCH SCREEN STYLES --- */
+        #launcher-screen {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-color: #1a1a1a;
+            border: 2px solid #333;
+            border-radius: 10px;
+            padding: 30px;
+            margin-top: 40px;
+            box-shadow: 0 4px 25px rgba(0,0,0,0.5);
+            max-width: 400px;
+            width: 90%;
+            box-sizing: border-box;
+            text-align: center;
+        }
+
+        #launcher-screen h2 {
+            margin-top: 0;
+            color: #ffeb3b;
+            font-size: 22px;
+        }
+
+        #launcher-screen p {
+            color: #ddd;
+            font-size: 15px;
+            margin-bottom: 20px;
+        }
+
+        #puzzle-select-input {
+            width: 80px;
+            height: 40px;
+            font-size: 20px;
+            font-weight: bold;
+            text-align: center;
+            border: 2px solid #555;
+            background: #333;
+            color: #fff;
+            border-radius: 6px;
+            margin-bottom: 15px;
+            outline: none;
+        }
+
+        #puzzle-select-input:focus {
+            border-color: #1e88e5;
+        }
+
+        #launch-btn {
+            background: #1e88e5;
+            color: white;
+            border: none;
+            padding: 10px 25px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            transition: background 0.2s;
+        }
+
+        #launch-btn:active { background: #1565c0; }
+
+        #launcher-error {
+            color: #e57373;
+            font-size: 13px;
+            margin-top: 10px;
+            min-height: 18px;
+            font-weight: bold;
+        }
+
+        /* Hide main components until unlocked */
+        #main-layout, #action-bar {
+            display: none; 
+        }
+
+        /* --- EXISTING GAME LAYOUT STYLES --- */
+        #main-layout {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            width: 100%;
+            max-width: 100%;
+        }
+
+        #game-container {
+            position: relative;
+            background-color: #111;
+            padding: 10px;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            width: 100%;
+            max-width: 720px;
+            box-sizing: border-box;
+        }
+
+        svg {
+            background-color: #444;
+            border-radius: 4px;
+            display: block;
+            width: 100%;      
+            height: auto;     
+        }
+
+        .cell-input {
+            width: 32px;
+            height: 32px;
+            border: none;
+            background-color: transparent !important; 
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            color: #000;
+            text-transform: uppercase;
+            outline: none;
+            padding: 0;
+            caret-color: transparent; 
+            border-radius: 4px;
+        }
+
+        .cell-input:focus {
+            background-color: rgba(255, 145, 0, 0.4) !important;
+            color: #000 !important;
+        }
+
+        .slashed-incorrect {
+            background: linear-gradient(to top right, transparent 46%, #c62828 46%, #c62828 54%, transparent 54%) !important;
+            color: #c62828 !important;
+        }
+
+        #clue-display {
+            background: #2a2a2a;
+            border: 2px solid #555;
+            border-radius: 6px;
+            padding: 15px;
+            width: 90vw;
+            max-width: 600px;
+            box-sizing: border-box;
+            margin-top: 10px;
+        }
+
+        .clue-sect { margin-bottom: 12px; }
+        .clue-sect:last-child { margin-bottom: 0; }
+        .clue-title { font-weight: bold; color: #ffeb3b; border-bottom: 1px solid #444; padding-bottom: 3px; margin-bottom: 5px; font-size: 14px;}
+        .clue-text { font-size: 15px; margin: 4px 0; line-height: 1.4; }
+
+        #action-bar {
+            margin-top: 10px;
+            width: 100%;
+            max-width: 650px;
+            display: flex;
+            gap: 4px;
+            justify-content: center;
+            box-sizing: border-box;
+            padding: 0 5px;
+        }
+
+        .action-btn {
+            flex: 1;
+            min-width: 0; /* Prevents overflow behavior on narrow mobile views */
+            height: 24px;
+            line-height: 24px;
+            border: none;
+            border-radius: 4px;
+            color: white;
+            font-size: 10px; /* Slightly scaled back layout font-size baseline for perfect 5-button alignment */
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+            transition: background 0.2s;
+            padding: 0 2px;
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        #check-btn { background: #f57c00; }
+        #check-btn:active { background: #ef6c00; }
+        #check-btn.active-state { background: #7b1fa2; }
+
+        #reveal-btn { background: #00897b; }
+        #reveal-btn:active { background: #00695c; }
+        
+        #reset-btn { background: #c62828; }
+        #reset-btn:active { background: #b71c1c; }
+
+        #exit-btn { background: #ab47bc; }
+        #exit-btn:active { background: #8e24aa; }
+
+        #info-btn { background: #1e88e5; }
+        #info-btn:active { background: #1565c0; }
+
+        .status-banner {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            padding: 20px 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 25px rgba(0,0,0,0.6);
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+            pointer-events: none;
+            animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            z-index: 10;
+        }
+
+        #win-banner {
+            background: rgba(46, 125, 50, 0.95);
+            border: 3px solid #81c784;
+        }
+
+        #try-again-banner {
+            background: rgba(198, 40, 40, 0.95);
+            border: 3px solid #e57373;
+            font-size: 20px;
+        }
+
+        #rules-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 100;
+            justify-content: center;
+            align-items: center;
+            box-sizing: border-box;
+            padding: 20px;
+        }
+
+        .rules-card {
+            background: #2a2a2a;
+            border: 2px solid #1e88e5;
+            border-radius: 10px;
+            max-width: 500px;
+            padding: 25px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.7);
+            text-align: left;
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.1);
+        }
+
+        .rules-card h2 {
+            margin-top: 0;
+            color: #1e88e5;
+            font-size: 20px;
+            border-bottom: 1px solid #444;
+            padding-bottom: 8px;
+        }
+
+        .rules-card p {
+            font-size: 15px;
+            line-height: 1.5;
+            color: #ddd;
+            margin-bottom: 20px;
+        }
+
+        .rules-card strong {
+            color: #ffeb3b;
+        }
+
+        .rules-footer {
+            font-size: 12px;
+            color: #888;
+            text-align: center;
+            border-top: 1px solid #444;
+            padding-top: 10px;
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        #virtual-keyboard {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            width: 100%;
+            max-width: 600px;
+            background: #151515;
+            padding: 10px;
+            border-radius: 8px;
+            box-sizing: border-box;
+            margin-top: 10px;
+        }
+
+        @media (pointer: fine) {
+            #virtual-keyboard {
+                display: none;
+            }
+        }
+
+        .kbd-row {
+            display: flex;
+            justify-content: center;
+            gap: 4px;
+            width: 100%;
+        }
+
+        .key {
+            flex: 1;
+            height: 44px;
+            background: #3a3a3a;
+            border: none;
+            border-radius: 4px;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            touch-action: manipulation;
+        }
+
+        .key:active { background: #555; }
+        .key.wide { flex: 1.5; background: #c62828; }
+        .key.nav { background: #1e88e5; }
+    </style>
+</head>
+<body>
+
+    <h1>HexaCross Mini</h1>
+    
+    <div id="launcher-screen">
+        <h2>Welcome to HexaCross!</h2>
+        <p>Please choose a puzzle between #1 and #12 to begin your session.</p>
+        <input type="number" id="puzzle-select-input" min="1" max="12" placeholder="1-12" value="1">
+        <button id="launch-btn">Load Puzzle</button>
+        <div id="launcher-error"></div>
+    </div>
+
+    <div id="puzzle-id-banner" style="display: none;">Puzzle ID: #--</div>
+    
+    <div id="main-layout">
+        <div id="game-container">
+            <svg id="crossword-svg" viewBox="0 0 670 440"></svg>
+            <div id="win-banner" class="status-banner">Puzzle Solved!</div>
+            <div id="try-again-banner" class="status-banner">Not quite correct yet!<br>Keep trying.</div>
+        </div>
+
+        <div id="clue-display">
+            <div class="clue-sect">
+                <div class="clue-title">Row Clues</div>
+                <div id="row-clues-container"><p class="clue-text" style="color:#aaa;">Click a square to view clues.</p></div>
+            </div>
+            <div class="clue-sect">
+                <div class="clue-title">Hexagram Clues</div>
+                <div id="hex-clues-container"><p class="clue-text" style="color:#aaa;">Click a square to view clues.</p></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="action-bar">
+        <button id="check-btn" class="action-btn">Check Puzzle</button>
+        <button id="reveal-btn" class="action-btn">Reveal Puzzle</button>
+        <button id="reset-btn" class="action-btn">Reset Puzzle</button>
+        <button id="exit-btn" class="action-btn">New Puzzle</button>
+        <button id="info-btn" class="action-btn">Instructions</button>
+    </div>
+
+    <div id="rules-overlay">
+        <div class="rules-card">
+            <h2>How to Play HexaCross Mini</h2>
+            <p>HexaCross differs from regular crosswords in a number of ways. First, the Across (or Row) entries don't intersect with Down words or phrases but with 6-letter Hexagram entries. Second, you can only tell in which position a hexagram starts and in which direction it flows -- clockwise or counterclockwise -- from the context of the Row clues. Finally, in the 8 longer rows, there are two separate and separately clued entries that total 15 characters, and you have to determine where the first ends and the second begins. In the top and bottom rows, a single clue is provided for the 6-character answers.</p>
+            <div class="rules-footer">Click anywhere or press any key to close instructions</div>
+        </div>
+    </div>
+
+    <div id="virtual-keyboard" style="display: none;">
+        <div class="kbd-row">
+            <button class="key" data-key="Q">Q</button><button class="key" data-key="W">W</button><button class="key" data-key="E">E</button><button class="key" data-key="R">R</button><button class="key" data-key="T">T</button><button class="key" data-key="Y">Y</button><button class="key" data-key="U">U</button><button class="key" data-key="I">I</button><button class="key" data-key="O">O</button><button class="key" data-key="P">P</button>
+        </div>
+        <div class="kbd-row">
+            <button class="key" data-key="A">A</button><button class="key" data-key="S">S</button><button class="key" data-key="D">D</button><button class="key" data-key="F">F</button><button class="key" data-key="G">G</button><button class="key" data-key="H">H</button><button class="key" data-key="J">J</button><button class="key" data-key="K">K</button><button class="key" data-key="L">L</button>
+        </div>
+        <div class="kbd-row">
+            <button class="key wide" data-key="DEL">DEL</button><button class="key" data-key="Z">Z</button><button class="key" data-key="X">X</button><button class="key" data-key="C">C</button><button class="key" data-key="V">V</button><button class="key" data-key="B">B</button><button class="key" data-key="N">N</button><button class="key" data-key="M">M</button>
+            <button class="key nav" data-key="ArrowUp">&#9650;</button>
+        </div>
+        <div class="kbd-row">
+            <button class="key nav" data-key="ArrowLeft">&#9664;</button><button class="key nav" data-key="ArrowDown">&#9660;</button><button class="key nav" data-key="ArrowRight">&#9654;</button>
+        </div>
+    </div>
+
+    <script>
+        // --- BUILT-IN PUZZLE DATABASE ---
+        const myPuzzleLibrary = [
+{
+     id: 1,
+     data: `...LOG...OUT...
+MAZDASQUARRELER
+SHALLWESLEDRACE
+ANITAHILLPAELLA
+RCADOMEBIKEWAYS
+KNEELSNEWSDESKS
+CORBETTSEMOLINA
+JUILLIARDRETILE
+RECUSEDNEOPRENE
+...MAR...KIE...
+1. Good __<ASGOLD>|NON
+2. Wifi device<ROUTER>|JDN
+3. Gomer Pyle expletive<SHAZAM>|FRI
+4. Is, in math<EQUALS>|WED
+5. Tie up again<RELACE>|JDN
+6. "__ I Do" (much covered Irving Berlin number)<WHATLL>|NON
+7. Garnered<REAPED>|FRI
+8. Phrenology concerns<CRANIA>|JDN
+9. Holiday celebrated by music fans<BILLIE>|015
+10. Calms<ALLAYS>|015
+11. Showroom display<MODELS>|015
+12. Not balanced<SKEWED>|FRI
+13. O'Brien's role opposite Reagan's Gipp<ROCKNE>|015
+14. Most recently introduced<NEWEST>|FRI
+15. Doesn't slam the door on, maybe<ASKSIN>|FRI
+16. "Sure you did!"<ILLBET>|FRI
+17. Snake, periodically<MOLTER>|JDN
+18. Kitchen appliance<JUICER>|015
+19. OJ trial prosecutor Christopher<DARDEN>|JDN
+20. Brennan or Ford<EILEEN>|JDN
+21. Entertaining person<AMUSER>|WED
+22. More dawdling<POKIER>|NY0
+A. Exit, as a secure site<LOGOUT>|JDN
+B. Some Japanese cars<MAZDAS>|015
+  . One in a tiff<QUARRELER>|NON
+C. "Are you up for it?"<SHALLWE>|FRI
+  . Snow day competition<SLEDRACE>|NON
+D. She testified in Clarence Thomas's confirmation hearing<ANITAHILL>|015
+  . Spanish stewlike dish<PAELLA>|FRI
+E. Colts' former home<RCADOME>|FRI
+  . Cycling paths<BIKEWAYS>|NON
+F. Gets down, in a way<KNEELS>|FRI
+  . Locale where anchors sit<NEWSDESKS>|NON
+G. John of "Northern Exposure and "My Big Fat Greek Wedding"<CORBETT>|010
+  . Pasta flour<SEMOLINA>|FRI
+H. Noted performing arts school<JUILLIARD>|NY0
+  . Fix a floor, in a way<RETILE>|JDN
+I. Stepped aside, in court<RECUSED>|WED
+  . Wetsuit material<NEOPRENE>|015
+J. Rap's Biz __<MARKIE>|NY1
+`
+},
+{
+     id: 2,
+     data: `...TOU...CHE...
+KINDESTINSPECTS
+AESOPSDETECTIVE
+FLIRTYHEIRESSES
+PUPATESALDERMAN
+MICSTANDYOLANDA
+SOCRATICSKATEBY
+VIPERSUNCROWDED
+PUMICEDNAILFILE
+...COR...ERS...
+1. __ be (once was)<USEDTO>|JDN
+2. Requests for food, perhaps<CHEEPS>|FRI
+3. American realist who painted "The Gross Clinic" (1875)<EAKINS>|WED
+4. Like some glasses<TINTED>|FRI
+5. Boots<EVICTS>|FRI
+6. Smart<SPORTY>|FRI
+7. Puts up<ERECTS>|FRI
+8. Like some sunglasses<FLIPUP>|NON
+9. "The Last of __" (1973 murder mystery)<SHEILA>|015
+10. Ministers' residences<MANSES>|JDN
+11. Irritates insistently<EATSAT>|JDN
+12. Texas border town<LAREDO>|JDN
+13. __ rays<COSMIC>|JDN
+14. Crawford and Williams<CINDYS>|NON
+15. Image printing method using dots<BENDAY>|JDN
+16. Unwelcome watcher<STARER>|JDN
+17. Active<ATWORK> 1of 2|WED
+18. Hypodermic relative<IVPUMP>|JDN
+19. Company behind the 1960s yo-yo craze<DUNCAN>|FRI
+20. Said "Nothin' doin'!" for example<ELIDED>|JDN
+21. Foe of Mark Antony<CICERO>|FRI
+22. Circulars<FLIERS>|FRI
+A. "You've outwitted me"<TOUCHE>|015
+B. Least cold<KINDEST>|NY0
+  . Examines closely<INSPECTS>|015
+C. __ Fables<AESOPS>|FRI
+  . "True __" (HBO show since 2014)<DETECTIVE>|JDN
+D. Coquettish<FLIRTY>|NON
+  . Will beneficiaries<HEIRESSES>|JDN
+E. Forms a cocoon<PUPATES>|NON
+  . Local office<ALDERMAN>|NY0
+F. Standup comic's prop, at times<MICSTAND>|NON
+  . Four-time Grammy-winning gospel singer Adams<YOLANDA>|JDN
+G. Like teaching through questions<SOCRATIC>|NON
+  . Pass too easily<SKATEBY>|NON
+H. Snakes in the grass<VIPERS>|WED
+  . Half full, as a restaurant<UNCROWDED>|NON
+I. Abraded with a stone<PUMICED>|NON
+  . Manicure tool<NAILFILE>|WED
+J. Apple tools<CORERS>|JDN
+`
+},
+{
+     id: 3,
+     data: `...TAR...OTS...
+EPHEDRALUCKSOUT
+RISIBLESPROUTUP
+RAMONAACTRESSES
+VINCESNOSECONES
+AFTERALLFILLETS
+ROURKEIDEOGRAMS
+OHWELLFASTFOODS
+SINGLESATTESTER
+...GOT...SET...
+1. Like many Best Picture winners<RRATED> 2of 2|JDN
+2. Old means of public humiliation<STOCKS>|FRI
+3. Be wiped out<PERISH>|FRI
+4. Shut tight<SEALUP>|015
+5. Feeling annoyed and inconvenienced<PUTOUT> 2of 2|WED
+6. Britain, poetically<ALBION>|JDN
+7. Alarm clock, ideally<ROUSER>|JDN
+8. __ the Martian (Warner Brothers cartoon character)<MARVIN>|WED
+9. Responds to, as intelligence<ACTSON>|JDN
+10. Wits<SENSES>|FRI
+11. Lucrezia Borgia's brother<CESARE>|JDN
+12. Border __<COLLIE>|JDN
+13. "Like, wow!"<FAROUT>|FRI
+14. Skinny or small, probably<ILLFED>|FRI
+15. Cooks rice, perhaps<STEAMS>|JDN
+16. Inspirational Helen<KELLER>|WED
+17. Blanked on<FORGOT>|JDN
+18. "Anyone doing this thing with me?"<WHOSIN>|NON
+19. Equally quick<ASFAST>|FRI
+20. Grandparents, often<DOTERS>|FRI
+21. On-off switch, e.g.<TOGGLE>|WED
+22. English word that comes from Tswana<TSETSE>|FRI
+A. Mystical decks<TAROTS>|FRI
+B. Subject of an FDA dietary-supplement ban<EPHEDRA>|FRI
+  . Is fortunate<LUCKSOUT>|NON
+C. Disposed to laugh<RISIBLE>|FRI
+  . Appear suddenly<SPROUTUP>|NY1
+D. Beezus's sister, in children's literature<RAMONA>|015
+  . Hunt and Hunter, for two<ACTRESSES>|JDN
+E. Vaughn and Gill<VINCES>|JDN
+  . Guided missile sections<NOSECONES>|FRI
+F. Nevertheless<AFTERALL>|FRI
+  . Some bass pieces<FILLETS>|FRI
+G. Mickey of "9½ Weeks"<ROURKE>|WED
+  . Picture writings<IDEOGRAMS>|JDN
+H. "That's the way it goes"<OHWELL>|JDN
+  . Fare at KFC, McDonald's, Burger King, etc.<FASTFOODS>|NY0
+I. Billboard chart listings<SINGLES>|015
+  . One corroborating<ATTESTER>|NON
+J. Braced (for)<GOTSET>|JDN
+`
+},
+{
+     id: 4,
+     data: `...TYP...EAS...
+RUNNIERBEERFEST
+CHICAGODISFAVOR
+MALTINPAPAWTREE
+EGOISTSREFUNDED
+KRAMDENSGLENDAS
+REPLICAZAPRUDER
+ZATOPEKINDENIAL
+APACHESABIDEDBY
+...AST...LEY...
+1. Enter<TYPEIN> 2of 2|WED
+2. __ a bird<FREEAS> 2of 2|JDN
+3. Guttersnipe<URCHIN>|FRI
+4. Jean __ (1969 Oscar-winning title role for Maggie Smith)<BRODIE>|FRI
+5. Stashes and caches<TROVES> 2of 2|FRI
+6. Dramatic skill<ACTING>|JDN
+7. Rulings from muftis<FATWAS>|015
+8. Start limping<GOLAME>|NY0
+9. Monographs<PAPERS>|JDN
+10. Like a quarter's edge<REEDED>|FRI
+11. Watered lightly<MISTED>|JDN
+12. Steamship smokestack<FUNNEL>|JDN
+13. Find another spot, maybe<REPARK>|015
+14. Denizens of war-torn Israel<GAZANS>|NON
+15. Not so sunny<SADDER> 2of 2|WED
+16. Keep in order<POLICE>|FRI
+17. Lopped<PRUNED>|JDN
+18. 1910s Mexican revolutionary<ZAPATA>|FRI
+19. Robbins' ice cream partner<BASKIN>|015
+20. Stored up<LAIDBY>|JDN
+21. It may be found in one's chest<SACHET>|FRI
+22. It's closed for a wink<EYELID>|FRI
+A. High-strung sorts<TYPEAS>|FRI
+B. Less congealed<RUNNIER>|FRI
+  . Event involving draft picks<BEERFEST>|FRI
+C. Best Picture of 2002<CHICAGO>|015
+  . The doghouse, so to speak<DISFAVOR>|FRI
+D. Film reviewer Leonard<MALTIN>|JDN
+  . Fruit-bearing plant of the eastern US: var.<PAPAWTREE>|JDN
+E. Spotlight hogs<EGOISTS>|JDN
+  . Gave the money back<REFUNDED>|NON
+F. Ralph and Alice, on early TV<KRAMDENS>|NON
+  . Actresses Farrell and Jackson<GLENDAS>|WED
+G. Duplicate<REPLICA>|FRI
+  . The __ film (Kennedy assassination document)<ZAPRUDER>|NON
+H. 1952 Olympic marathon winner Emil<ZATOPEK>|NY0
+  . Unwilling to face reality<INDENIAL>|WED
+I. Attack choppers<APACHES>|WED
+  . Followed, as a rule<ABIDEDBY>|NON
+J. "Never Gonna Give You Up" singer Rick<ASTLEY>|FRI
+`
+},
+{
+     id: 5,
+     data: `...NUN...CIO...
+DISROBINGHIRING
+OSTRICHELECTEES
+JIMCARREYMENSCH
+NOSALTPLACENAME
+ACETENGLASSEYES
+DEDUCEMIDSUMMER
+REGRESSONLINEAD
+CONMANWESTWARDS
+...OLS...ONS...
+1. Yet to arrive<UNBORN>|015
+2. Baseball star Suzuki<ICHIRO>|JDN
+3. Some poets<ODISTS>|FRI
+4. Pat who played Commissioner Gordon<HINGLE>|JDN
+5. "The eye is not satisfied with __" (Ecclesiastes)<SEEING>|JDN
+6. Dress trim<RICRAC>|JDN
+7. Solidify, as a friendship<CEMENT>|015
+8. __ weed (plant painted by Georgia O'Keeffe)<JIMSON>|NON
+9. __ hater<PLAYER>|JDN
+10. Conceptual framework<SCHEMA>|015
+11. __ fingerprint<LATENT>|JDN
+12. They may be public<SCENES>|FRI
+13. Tony Blair's period as British P.M., e.g.<DECADE>|015
+14. "That does my heart good"<IMGLAD>|JDN
+15. Liverpool's river<MERSEY>|WED
+16. Not threatened<SECURE>|JDN
+17. Plain cotton weave<MUSLIN>|JDN
+18. __ eel<CONGER>|WED
+19. Attaches, in a way<SEWSON>|015
+20. Bob Marley feature<DREADS>|WED
+21. "Death of a Salesman" family<LOMANS>|JDN
+22. "Were so!" preceder, in a children's fight<WASNOT>|JDN
+A. Papal legate<NUNCIO>|WED
+B. Stripping<DISROBING>|NY0
+  . In need of help?<HIRING>|WED
+C. Bird with a strong kick<OSTRICH>|FRI
+  . Ins<ELECTEES>|010
+D. "Eternal Sunshine..." star<JIMCARREY>|NY0
+  . Good guy<MENSCH>|FRI
+E. Margarita option<NOSALT>|FRI
+  . Proper noun, at times<PLACENAME>|JDN
+F. Sure winner in blackjack<ACETEN>|015
+  . Features of antique dolls<GLASSEYES>|JDN
+G. Infer<DEDUCE>|JDN
+  . Season in a Shakespeare title<MIDSUMMER>|015
+H. Take two steps back<REGRESS>|JDN
+  . Plug in a browser<ONLINEAD>|015
+I. One with a racket<CONMAN>|015
+  . In the direction of the setting sun, to a Brit<WESTWARDS>|NON
+J. Kaitlin of "It's Always Sunny in Philadelphia" et al.<OLSONS>|JDN
+`
+},
+{
+     id: 6,
+     data: `...COO...ING...
+FLOTILLAEMITTED
+REWARDSQUAWKSAT
+ZENGERPROGRESSO
+ARBITRONBITMAPS
+CREAMEDWETSUITS
+RATIONALENFANTS
+KRONOSENROLLING
+UNCLOAKPINELOGS
+...REN...AME...
+1. "Chill out!"<COOLIT>|JDN
+2. Comic's asset<TIMING>|JDN
+3. Bouquet item<FLOWER>|JDN
+4. Act the rat<SQUEAL>|WED
+5. Checked for seasoning<TASTED>|015
+6. Consider<REGARD>|JDN
+7. News and opinion blog that dissolved in 2016<GAWKER>|JDN
+8. Impudent<BRAZEN>|FRI
+9. "Can do"<NOPROB>|FRI
+10. Novelist John Dos __<PASSOS>|JDN
+11. Teacher at an ecole<MAITRE>|JDN
+12. "__ be nice!"<ITMUST>|JDN
+13. Serious depression<CRATER>|FRI
+14. Little shaver, to Burns<WEELAD>|015
+15. Acts frugally<STINTS>|JDN
+16. Vidalia products<ONIONS>|JDN
+17. One of the Jimmys<FALLON>|JDN
+18. Crack open, in a way<UNCORK>|015
+19. Cal of sports<RIPKEN>|FRI
+20. Departures<GOINGS>|WED
+21. Body shop offering<LOANER>|FRI
+22. Tooth covering<ENAMEL>|FRI
+A. Whispering sweet nothings<COOING>|015
+B. Warship group<FLOTILLA>|FRI
+  . Put out<EMITTED>|FRI
+C. Bounty<REWARD>|FRI
+  . Complains to<SQUAWKSAT>|NON
+D. John Peter __ (early American publisher and free press champion)<ZENGER>|JDN
+  . Chickarina brand<PROGRESSO>|010
+E. Nielsen competitor, before the buyout<ARBITRON>|NON
+  . Computer image formats<BITMAPS>|010
+F. Didn't just beat<CREAMED>|WED
+  . Surfing gear<WETSUITS>|015
+G. Making sense<RATIONAL>|JDN
+  . Brest babes<ENFANTS>|NON
+H. The __ Quartet<KRONOS>|NON
+  . Signing up for<ENROLLING>|NON
+I. Become visible to sensors, on "Star Trek"<UNCLOAK>|NON
+  . Cabin-building material<PINELOGS>|NON
+J. Newly christen<RENAME>|FRI
+`
+},
+{
+     id: 7,
+     data: `...DUG...OUT...
+PROGNOSISGATHER
+LOCALLAWOVERSAW
+EDGEDUPVIDABLUE
+BRAINFARTMARGOT
+EGGROLLBEFOULED
+NAMEDROPUPRIVER
+ROCKCANDYREMAPS
+SETSCREWSPURRER
+...EVA...DES...
+1. Sea grass grazer<DUGONG>|FRI
+2. Catch between bases, say<TAGOUT>|NY0
+3. __ Harum ("Whiter Shade of Pale" band)<PROCOL>|JDN
+4. "Me too" relative<SOWASI>|JDN
+5. Laundromat fixture<WASHER>|NY0
+6. Subtly refer (to)<ALLUDE>|FRI
+7. Grammatical modifier<ADVERB>|JDN
+8. Attired<GARBED>|NY0
+9. "Friday the 13th __: The Final Chapter"<PARTIV>|NON
+10. Focus intently on<GLUETO>|NON
+11. Old Italian coin<FLORIN>|JDN
+12. End of a middle watch<FOURAM>|FRI
+13. Mysterious figure in "I Am the Walrus"<EGGMAN>|015
+14. Southwestern native<PUEBLO>|015
+15. One digging deep, as a researcher<DELVER>|JDN
+16. Arranged, as billiard balls in a triangle<RACKED>|JDN
+17. Wall layer<PRIMER>|JDN
+18. Girdle relative<CORSET>|JDN
+19. Franchise with the Frosty<WENDYS>|WED
+20. Kitchen utensils<PARERS>|JDN
+21. Joneses for<CRAVES>|JDN
+22. Puckered<PURSED>|WED
+A. Where many bats are seen<DUGOUT>|WED
+B. Medical prediction<PROGNOSIS>|NON
+  . Bring together<GATHER>|JDN
+C. Ordinance<LOCALLAW>|FRI
+  . Supervised<OVERSAW>|WED
+D. Crept<EDGEDUP>|NON
+  . He won a Cy Young Award and a Most Valuable Player Award in 1971<VIDABLUE>|NON
+E. Mental lapse, informally<BRAINFART>|NON
+  . Fonteyn or Kidder<MARGOT>|JDN
+F. Annual White House event<EGGROLL>|FRI
+  . Dirtied<BEFOULED>|NON
+G. Try to impress, in a way<NAMEDROP>|WED
+  . Opposite the current<UPRIVER>|FRI
+H. Sugar in large crystals<ROCKCANDY>|NY1
+  . Scans anew for Waze<REMAPS>|JDN
+I. They hold some light covers in place<SETSCREWS>|JDN
+  . Coddled kitty, e.g.<PURRER>|010
+J. Gives the slip<EVADES>|FRI`
+},
+{
+     id: 8,
+     data: `...BEN...OIT...
+MCCOURTYESSIREE
+AERATIONTHEFEDS
+PHILANDERRENTTO
+OHPLEASEABASHED
+HEADEDUPSLEUTHS
+NOTSORRYSKIMPED
+EGGIESTTELEMARK
+REAMERAPPLECORE
+...LAC...TIC...
+1. Ludlum's amnesiac Jason<BOURNE>|FRI
+2. "Just as you said"<SOITIS>|JDN
+3. Joel of "Sullivan's Travels"<MCCREA>|WED
+4. "Gimme a minute!"<NOTYET>|FRI
+5. Lose it, like a bull<SEERED>|JDN
+6. Jennifer Lopez, e.g.<LATINA>|JDN
+7. Publisher Hugh<HEFNER>|JDN
+8. Rap relative<HIPHOP>|FRI
+9. Cooked on high heat<SEARED> 2of 2|JDN
+10. Precisely, after "on"<THEDOT>|010
+11. Like '60s gasoline<LEADED>|JDN
+12. Helpful<USABLE>|FRI
+13. Patricia of "The Middle"<HEATON>|JDN
+14. Pancake toppers<SYRUPS>|010
+15. Low points<DEPTHS>|WED
+16. "__ Lullaby" (Norah Jones song)<ROSIES>|JDN
+17. One of the Jimmys<KIMMEL>|JDN
+18. Ska kin<REGGAE>|FRI
+19. Engine rod<TAPPET>|FRI
+20. Mr. Montalban's "Fantasy Island" surname<ROARKE>|JDN
+21. Not so jumpy<CALMER>|JDN
+22. __ Sea between Ireland and England<CELTIC>|FRI
+A. 1984 gold-medalist marathoner Joan<BENOIT>|WED
+B. "Angela's Ashes" author Frank<MCCOURT>|FRI
+  . "Absotootely!"<YESSIREE>|JDN
+C. Carbon dioxide treatment<AERATION>|FRI
+  . Raiding group, familiarly<THEFEDS>|015
+D. Womanize<PHILANDER>|JDN
+  . Have as a tenant<RENTTO>|NY1
+E. "Stop your nonsense!"<OHPLEASE>|015
+  . Embarrassed<ABASHED>|JDN
+F. Was in charge of<HEADEDUP>|010
+  . Spade and Hammer<SLEUTHS>|015
+G. "No regrets"<NOTSORRY>|JDN
+  . Was stingy<SKIMPED>|NON
+H. Quiche superlative<EGGIEST>|JDN
+  . Skiing style<TELEMARK>|NON
+I. Hole widener<REAMER>|FRI
+  . Gala leftover<APPLECORE>|015
+J. __ acid<LACTIC>|WED`
+},
+{
+     id: 9,
+     data: `...WET...MOP...
+GOTTOGOSIGNINGS
+AVERRINGSENHORA
+GALAEVENTBRUCES
+SIOUANTRENCHANT
+LOGGIATIDALBORE
+FERBERBANJOISTS
+ABLEWASPARENTED
+DALTONSETSASIDE
+...DRY...ROT...
+1. Walked in the rain, say<GOTWET>|NY0
+2. In a funk<MOPING>|WED
+3. Bestowed upon<GAVETO>|JDN
+4. Word from the ancient Greek for knowledge<GNOSIS>|JDN
+5. Java wrap<SARONG>|FRI
+6. Disembark<ARRIVE>|JDN
+7. 1959 winner of a record 11 Oscars<BENHUR>|FRI
+8. French mathematician Évariste who died before his 21st birthday<GALOIS>|NON
+9. Many a hiker on the Appalachian Trail<TENTER>|JDN
+10. Hypotenuse-to-adjacent-side ratio<SECANT>|FRI
+11. "The Night of the __"<IGUANA>|JDN
+12. Turn pale<BLANCH>|WED
+13. Driving range customer<GOLFER>|JDN
+14. Highwayman<BANDIT>|FRI
+15. Most miffed<SOREST>|015
+16. Start of a sign on a gate<BEWARE>|WED
+17. Clubby type<JOINER>|015
+18. "Anyone who hates...dogs can't be __" (W. C. Fields)<ALLBAD>|JDN
+19. Outbreaks<SPATES>|JDN
+20. Emulated Maxwell Perkins<EDITED>|JDN
+21. Still damp<NOTDRY>|JDN
+22. Noted couple on the Titanic<ASTORS>|JDN
+A. Clean, as a floor<WETMOP>|NY1
+B. "Must leave!"<GOTTOGO>|NON
+  . Contract consummations<SIGNINGS>|NON
+C. Asserting<AVERRING>|NON
+  . Lisbon lady<SENHORA>|WED
+D. Black-tie ball, e.g.<GALAEVENT>|JDN
+  . Wayne and Banner of comics<BRUCES>|NON
+E. Great Plains language family<SIOUAN>|015
+  . Penetrating, as an insight<TRENCHANT>|015
+F. "Big" actor Robert<LOGGIA>|JDN
+  . It pushes ocean water upstream<TIDALBORE>|NON
+G. "Gigolo" author Edna<FERBER>|JDN
+  . Some bluegrass players<BANJOISTS>|NON
+H. "__ I ere..."<ABLEWAS>|JDN
+  . Guided, as children<PARENTED>|NON
+I. 007 player Timothy<DALTON>|FRI
+  . Saves<SETSASIDE>|FRI
+J. Timber fungus<DRYROT>|FRI
+`
+},
+{
+     id: 10,
+     data: `...HOT...ELS...
+GHOSTINGSNAPSON
+NIECESALCENTRAL
+WRITINGANGELICA
+OCEANIALEESHORE
+ZIPCARBEFORENOW
+DEPRESSTILTABLE
+VAGARIESHOOKING
+REUNITERISSARAE
+...MAR...IEL...
+1. August comment<ITSHOT>|FRI
+2. Solar energy units<PANELS>|JDN
+3. Turning up on the farm?<HOEING>|FRI
+4. Alarm sounds<CLANGS>|JDN
+5. Author of the "Wiener Dog Art" collection<LARSON>|FRI
+6. Entomologist's subject<INSECT>|JDN
+7. Nonabrasive, perhaps<GENTLE>|JDN
+8. __ shell necklace<COWRIE>|JDN
+9. Lead ore<GALENA>|015
+10. Musical work whose name means "valiant"<EROICA>|FRI
+11. Riding<INACAR>|JDN
+12. Hector, Hercules et al.<HEROES>|JDN
+13. Sped (by)<ZIPPED>|WED
+14. Is suitable for<BEFITS>|WED
+15. Tried to cool, as soup<BLEWON>|JDN
+16. Alarmed one?<ARISER>|JDN
+17. Consider<LOOKAT>|FRI
+18. Harder to see, as shapes<VAGUER>|015
+19. Firm acceptances?<HIREES>|FRI
+20. Engaged<INGEAR>|FRI
+21. Luther or Landau<MARTIN>|JDN
+22. Screen canine<LASSIE>|JDN
+A. Monopoly buys<HOTELS>|015
+B. Not replying to texts and such<GHOSTING>|NON
+  . Attaches with a click<SNAPSON>|FRI
+C. Flower girls, often<NIECES>|JDN
+  . Cleveland Guardians gp.<ALCENTRAL>|JDN
+D. "On __" (Stephen King memoir)<WRITING>|010
+  . Medicinal root<ANGELICA>|JDN
+E. Polynesia, Micronesia, et al.<OCEANIA>|FRI
+  . Potential danger spot for a ship<LEESHORE>|015
+F. Lyft Rentals alternative<ZIPCAR>|JDN
+  . In the past<BEFORENOW>|NON
+G. Get down<DEPRESS>|FRI
+  . Like some steering wheels<TILTABLE>|NON
+H. Unpredictable occurrences<VAGARIES>|010
+  . NHL foul<HOOKING>|NON
+I. Investigator who finds someone's birth mother, say<REUNITER>|FRI
+  . "Awkward Black Girl" creator<ISSARAE>|JDN
+J. Ernest's granddaughter<MARIEL>|WED
+`
+},
+{
+     id: 11,
+     data: `...SAY...BOO...
+CINEASTONDEMAND
+NEOCONNEWJERSEY
+DOASIDOTREMOLOS
+ELBOWPADMEANTIT
+IMALLINCALDERAS
+MOSELLEMRWILSON
+YESTHANKSSAMPAN
+HALFSHELLINURED
+...PRA...TES...
+1. __ pie<EASYAS> 2of 2|JDN
+2. Thundered<BOOMED>|JDN
+3. Affluent Los Angeles district<ENCINO>|015
+4. Rambled<WENTON> 2of 2|FRI
+5. Improv mantra<YESAND>|JDN
+6. Like older Netflix films<ONDISC>|JDN
+7. Powell of the Fed<JEROME>|FRI
+8. Possible to achieve<DOABLE>|JDN
+9. Literary character who's "always good-tempered" and "not very clever"<MRTOAD>|FRI
+10. Went postal<LOSTIT>|JDN
+11. Cushion<PILLOW>|FRI
+12. Betrayed a bias<LEANED>|FRI
+13. Champagne and O.J.<MIMOSA>|JDN
+14. Lover of Escamillo, in opera<CARMEN>|FRI
+15. Firebugs commit them<ARSONS>|WED
+16. Like the asp, to Cleo<LETHAL>|JDN
+17. Sprinter Rudolph, activist Mankiller, and others<WILMAS>|NON
+18. "Without Me" (2018) singer<HALSEY>|JDN
+19. Sounds ominously<KNELLS>|FRI
+20. Cater basely<PANDER>|WED
+21. Key of Beethoven's Piano Sonata No. 24<FSHARP>|FRI
+22. Hooks together<UNITES>|JDN
+A. Make even the slightest comment<SAYBOO>|015
+B. Movie buff<CINEAST>|JDN
+  . Like some payments<ONDEMAND>|JDN
+C. Many an ex-lib<NEOCON>|FRI
+  . Princeton's home<NEWJERSEY>|NON
+D. "Follow my lead"<DOASIDO>|WED
+  . Vibrating musical effects<TREMOLOS>|WED
+E. Skateboarder's safety item<ELBOWPAD>|015
+  . Wasn't joking<MEANTIT>|015
+F. Risky poker declaration<IMALLIN>|NON
+  . Volcanic depressions<CALDERAS>|WED
+G. Light, white wine<MOSELLE>|FRI
+  . Whom Dennis often menaced<MRWILSON>|015
+H. "That would be great!"<YESTHANKS>|JDN
+  . Hong Kong harbor craft<SAMPAN>|WED
+I. Oysters on the __<HALFSHELL>|JDN
+  . Adapted to rigors<INURED>|JDN
+J. Chatters foolishly<PRATES>|JDN
+`
+},
+{
+     id: 12,
+     data: `...JAN...GLE...
+SLYDOGMUGGINESS
+CIRQUEBELONGSTO
+THEYSAYFIREIRON
+LAAREAVILLAGERS
+NUDGESLEVANTINE
+TIEMPOCARNIVALS
+PITIESLIFEBOATS
+PEDDLELINEDANCE
+...DID...NOT...
+1. Reinhardt of music<DJANGO>|JDN
+2. Nitpick<NIGGLE>|FRI
+3. Words<LYRICS>|015
+4. Bryant or Greg<GUMBEL>|NON
+5. Jettisons<TOSSES>|FRI
+6. None too comfortable<QUEASY>|FRI
+7. Slight<IGNORE>|FRI
+8. Tennis great Gibson<ALTHEA>|015
+9. Malign<VILIFY>|NY0
+10. Nighttime noisemaker<SNORER>|JDN
+11. Wheel gunk<GREASE>|JDN
+12. Of an 18th century music style<GALANT>|JDN
+13. Loose<UNTIED>|FRI
+14. Longtime ice cream cake brand<CARVEL>|WED
+15. Singers Cleo and Frankie<LAINES>|JDN
+16. Be a bother<IMPOSE>|015
+17. Jersey, e.g.<BOVINE>|FRI
+18. Didn't stiff<TIPPED>|WED
+19. Hole packing<INFILL> 2of 2|JDN
+20. Something taken before swinging<STANCE>|FRI
+21. Cheat<DIDDLE>|010
+22. Initiated repentance<ATONED>|JDN
+A. Sound of spurs<JANGLE>|JDN
+B. Devious fellow<SLYDOG>|JDN
+  . Humid condition<MUGGINESS>|NON
+C. __ du Soleil<CIRQUE>|WED
+  . Is owned by<BELONGSTO>|JDN
+D. Phrase of nonspecific attribution<THEYSAY>|WED
+  . Poker<FIREIRON>|NON
+E. Orange County, Ventura County, et al.<LAAREA>|JDN
+  . Townsfolk relatives<VILLAGERS>|JDN
+F. Attention getters' moves<NUDGES>|JDN
+  . Of the eastern Mediterranean<LEVANTINE>|JDN
+G. Al mismo __ (simultaneously, in Seville)<TIEMPO>|NON
+  . Traveling fairs<CARNIVALS>|NON
+H. Feels sorry for<PITIES>|015
+  . They can go overboard<LIFEBOATS>|NY0
+I. Hawk<PEDDLE>|FRI
+  . Electric Slide or Cotton-Eyed Joe<LINEDANCE>|015
+J. Terse childish denial<DIDNOT>|WED
+`
+}
+];
+
+        // --- SELECTION ENGINE ---
+        let currentPuzzleId = null;
+        const solutionGrid = [];
+        const hexClues = {};
+        const rowClues = {};
+
+        // Bind launch actions
+        document.getElementById("launch-btn").addEventListener("click", validateAndLoadPuzzle);
+        document.getElementById("puzzle-select-input").addEventListener("keydown", (e) => {
+            if (e.key === "Enter") validateAndLoadPuzzle();
+        });
+
+        function validateAndLoadPuzzle() {
+            const inputVal = document.getElementById("puzzle-select-input").value;
+            const targetId = parseInt(inputVal, 10);
+            const errorDiv = document.getElementById("launcher-error");
+
+            if (typeof myPuzzleLibrary === "undefined" || myPuzzleLibrary.length === 0) {
+                errorDiv.textContent = "Error: Library database array missing.";
+                return;
+            }
+
+            // Look for the specific object entry matching the requested ID property
+            const chosenPuzzle = myPuzzleLibrary.find(p => p.id === targetId);
+
+            if (!chosenPuzzle) {
+                errorDiv.textContent = `Puzzle ID #${targetId} not found in the library database.`;
+                return;
+            }
+
+            errorDiv.textContent = "";
+            currentPuzzleId = chosenPuzzle.id;
+
+            // Execute parser engine
+            parsePuzzleData(chosenPuzzle.data);
+
+            // Hide launcher panel, display layout
+            document.getElementById("launcher-screen").style.display = "none";
+            document.getElementById("puzzle-id-banner").textContent = "Puzzle ID: #" + currentPuzzleId;
+            document.getElementById("puzzle-id-banner").style.display = "block";
+            document.getElementById("main-layout").style.display = "flex";
+            document.getElementById("action-bar").style.display = "flex";
+
+            // Trigger touch keyboard setup context check
+            if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+                document.getElementById("virtual-keyboard").style.display = "flex";
+            }
+
+            // Restore state if puzzle progress exists
+            loadPuzzleProgress();
+        }
+
+        // --- INGESTION PARSING ENGINE ---
+        function parsePuzzleData(rawString) {
+            // Empty arrays if previously populated
+            solutionGrid.length = 0;
+            for (let k in hexClues) delete hexClues[k];
+            for (let k in rowClues) delete rowClues[k];
+
+            const rawLines = rawString.split('\n').map(l => l.trim()).filter(l => l.length > 0);
+            let currentLetterLabel = "";
+
+            rawLines.forEach((line, index) => {
+                if (index < 10) { 
+                    let cleanedGridLine = line.replace(/[\s.,    ]/g, '.');
+                    while (cleanedGridLine.length < 15) {
+                        cleanedGridLine += '.';
+                    }
+                    solutionGrid.push(cleanedGridLine);
+                    return;
+                }
+
+                const hexMatch = line.match(/^(\d+)\.\s*([^<]+)/);
+                if (hexMatch) {
+                    const hexId = hexMatch[1];
+                    hexClues[hexId] = hexMatch[2].trim();
+                    return;
+                }
+
+                const rowStartMatch = line.match(/^([A-J])\.\s*([^<]+)/);
+                if (rowStartMatch) {
+                    currentLetterLabel = rowStartMatch[1];
+                    rowClues[currentLetterLabel] = [rowStartMatch[2].trim()];
+                    return;
+                }
+
+                if (line.startsWith('.') || line.startsWith('  .') || line.match(/^\s+\./)) {
+                    const continuationMatch = line.match(/\.\s*([^<]+)/);
+                    if (continuationMatch && currentLetterLabel) {
+                        rowClues[currentLetterLabel].push(continuationMatch[1].trim());
+                    }
+                }
+            });
+        }
+
+        // --- GLOBAL LAYOUT VARIABLES ---
+        const colWidth = 40;   
+        const rowHeight = 40;  
+        const offsetX = 55;    
+        const offsetY = 30;    
+        const labels = "ABCDEFGHIJ"; 
+
+        const hexData = [
+            { id: "01", col: 4.5,  row: 1 }, { id: "02", col: 10.5, row: 1 },
+            { id: "03", col: 1.5,  row: 2 }, { id: "04", col: 7.5,  row: 2 }, { id: "05", col: 13.5, row: 2 },
+            { id: "06", col: 4.5,  row: 3 }, { id: "07", col: 10.5, row: 3 },
+            { id: "08", col: 1.5,  row: 4 }, { id: "09", col: 7.5,  row: 4 }, { id: "10", col: 13.5, row: 4 },
+            { id: "11", col: 4.5,  row: 5 }, { id: "12", col: 10.5, row: 5 },
+            { id: "13", col: 1.5,  row: 6 }, { id: "14", col: 7.5,  row: 6 }, { id: "15", col: 13.5, row: 6 },
+            { id: "16", col: 4.5,  row: 7 }, { id: "17", col: 10.5, row: 7 },
+            { id: "18", col: 1.5,  row: 8 }, { id: "19", col: 7.5,  row: 8 }, { id: "20", col: 13.5, row: 8 },
+            { id: "21", col: 4.5,  row: 9 }, { id: "22", col: 10.5, row: 9 }
+        ];
+
+        const svg = document.getElementById("crossword-svg");
+        const gridInputs = {};
+        let activeInput = null;
+        let isChecking = false;
+        let isOverlayOpen = false;
+
+        // 1. Draw Row Labels
+        for (let i = 0; i < 10; i++) {
+            const text = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            text.setAttribute("x", offsetX - 35);
+            text.setAttribute("y", offsetY + (i * rowHeight) + (rowHeight / 2) + 6);
+            text.setAttribute("fill", "#fff");
+            text.setAttribute("font-weight", "bold");
+            text.setAttribute("font-size", "18px");
+            text.setAttribute("text-anchor", "middle");
+            text.textContent = labels[i];
+            svg.appendChild(text);
+        }
+
+        // 2. Build Hexagram Layout Geometries
+        hexData.forEach(hex => {
+            const cx = offsetX + (hex.col - 0.5) * colWidth;
+            const cy = offsetY + (hex.row) * rowHeight; 
+            const hw = (colWidth * 3) / 2;
+            const hh = (rowHeight * 2) / 2;
+
+            const group = document.createElementNS("http://www.w3.org/2000/svg", "g");
+
+            const outerPath = document.createElementNS("http://www.w3.org/2000/svg", "path");
+            const d = `
+                M ${cx - hw} ${cy}
+                C ${cx - 1.1 * hw} ${cy - 1.1 * hh} ${cx - hw /2} ${cy - hh} ${cx} ${cy - hh}
+                C ${cx + hw / 2} ${cy - hh} ${cx + 1.1 * hw} ${cy - 1.1 * hh} ${cx + hw} ${cy}
+                C ${cx + 1.1 * hw} ${cy + 1.1 * hh} ${cx + hw / 2} ${cy + hh} ${cx} ${cy + hh}
+                C ${cx - hw / 2} ${cy + hh} ${cx - 1.1 * hw} ${cy + 1.1 * hh} ${cx - hw} ${cy}
+                Z
+            `;
+            outerPath.setAttribute("d", d);
+            outerPath.setAttribute("fill", "#dcdcdc");
+            outerPath.setAttribute("stroke", "#000");
+            outerPath.setAttribute("stroke-width", "2");
+            group.appendChild(outerPath);
+
+            const lines = [
+                {x1: cx - hw, y1: cy, x2: cx + hw, y2: cy, w: 2},
+                {x1: cx - colWidth/2, y1: cy - hh, x2: cx - colWidth/2, y2: cy + hh, w: 1},
+                {x1: cx + colWidth/2, y1: cy - hh, x2: cx + colWidth/2, y2: cy + hh, w: 1}
+            ];
+            lines.forEach(l => {
+                const ln = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                ln.setAttribute("x1", l.x1); ln.setAttribute("y1", l.y1);
+                ln.setAttribute("x2", l.x2); ln.setAttribute("y2", l.y2);
+                ln.setAttribute("stroke", "#000"); ln.setAttribute("stroke-width", l.w);
+                group.appendChild(ln);
+            });
+
+            const badge = document.createElementNS("http://www.w3.org/2000/svg", "rect");
+            badge.setAttribute("x", cx - (colWidth * 0.8)/2); badge.setAttribute("y", cy - (rowHeight * 0.45)/2);
+            badge.setAttribute("width", colWidth * 0.8); badge.setAttribute("height", rowHeight * 0.45);
+            badge.setAttribute("fill", "#000");
+            group.appendChild(badge);
+
+            const numText = document.createElementNS("http://www.w3.org/2000/svg", "text");
+            numText.setAttribute("x", cx); numText.setAttribute("y", cy + 5);
+            numText.setAttribute("fill", "#fff"); numText.setAttribute("font-size", "14px");
+            numText.setAttribute("font-weight", "bold"); numText.setAttribute("text-anchor", "middle");
+            numText.textContent = hex.id;
+            group.appendChild(numText);
+
+            const targetCells = [
+                { r: hex.row,     c: Math.floor(hex.col) - 1 }, { r: hex.row,     c: Math.floor(hex.col)     }, { r: hex.row,     c: Math.floor(hex.col) + 1 },
+                { r: hex.row + 1, c: Math.floor(hex.col) - 1 }, { r: hex.row + 1, c: Math.floor(hex.col)     }, { r: hex.row + 1, c: Math.floor(hex.col) + 1 }
+            ];
+
+            targetCells.forEach((cell) => {
+                const coordKey = `${cell.r}-${cell.c}`;
+                if (!gridInputs[coordKey]) {
+                    const fo = document.createElementNS("http://www.w3.org/2000/svg", "foreignObject");
+                    
+                    fo.setAttribute("x", offsetX + (cell.c - 0.5) * colWidth + 4);
+                    fo.setAttribute("y", offsetY + (cell.r - 1) * rowHeight + 4);
+                    fo.setAttribute("width", 32);
+                    fo.setAttribute("height", 32);
+
+                    const input = document.createElement("input");
+                    input.type = "text"; input.maxLength = 1; input.className = "cell-input";
+                    input.setAttribute("readonly", "true"); 
+                    input.dataset.row = cell.r; input.dataset.col = cell.c;
+
+                    const selectHandler = (e) => {
+                        e.preventDefault();
+                        if (isOverlayOpen) return;
+                        input.focus();
+                        activeInput = input;
+                        updateCluePanels(cell.r, cell.c);
+                    };
+                    input.addEventListener("mousedown", selectHandler);
+                    input.addEventListener("touchstart", selectHandler);
+
+                    fo.appendChild(input);
+                    group.appendChild(fo);
+                    gridInputs[coordKey] = input;
+                }
+            });
+            svg.appendChild(group);
+        });
+
+        // 3. Clue Panels Lookup Engine
+        function updateCluePanels(rowNum, colNum) {
+            const rowLabel = labels[rowNum - 1];
+            const rowClueContainer = document.getElementById("row-clues-container");
+            const hexClueContainer = document.getElementById("hex-clues-container");
+
+            rowClueContainer.innerHTML = "";
+            const currentCList = rowClues[rowLabel] || [];
+            if(currentCList.length === 1) {
+                rowClueContainer.innerHTML = `<p class="clue-text"><strong>${rowLabel}:</strong> ${currentCList[0]}</p>`;
+            } else if(currentCList.length === 2) {
+                rowClueContainer.innerHTML = `
+                    <p class="clue-text"><strong>${rowLabel} (Left):</strong> ${currentCList[0]}</p>
+                    <p class="clue-text"><strong>${rowLabel} (Right):</strong> ${currentCList[1]}</p>
+                `;
+            }
+
+            hexClueContainer.innerHTML = "";
+            let foundHex = false;
+
+            hexData.forEach(hex => {
+                const minC = Math.floor(hex.col) - 1;
+                const maxC = Math.floor(hex.col) + 1;
+                const matchRow = (rowNum === hex.row || rowNum === hex.row + 1);
+                const matchCol = (colNum >= minC && colNum <= maxC);
+
+                if (matchRow && matchCol) {
+                    const hId = parseInt(hex.id).toString();
+                    hexClueContainer.innerHTML += `<p class="clue-text"><strong>Hex #${hex.id}:</strong> ${hexClues[hId] || "Clue not found."}</p>`;
+                    foundHex = true;
+                }
+            });
+
+            if(!foundHex) {
+                hexClueContainer.innerHTML = `<p class="clue-text" style="color:#aaa;">No intersecting hexagram context.</p>`;
+            }
+        }
+
+        // --- STATE MANAGEMENT ENGINE (SAVE/LOAD PER PUZZLE ID) ---
+        function savePuzzleProgress() {
+            if (!currentPuzzleId) return;
+            const state = {};
+            for (let coordKey in gridInputs) {
+                if (gridInputs[coordKey].value !== "") {
+                    state[coordKey] = gridInputs[coordKey].value;
+                }
+            }
+            localStorage.setItem("hexacross_save_id_" + currentPuzzleId, JSON.stringify(state));
+        }
+
+        function loadPuzzleProgress() {
+            if (!currentPuzzleId) return;
+            
+            // Wipe any residue input values from past loaded sessions
+            for (let coordKey in gridInputs) {
+                gridInputs[coordKey].value = "";
+            }
+
+            const rawSave = localStorage.getItem("hexacross_save_id_" + currentPuzzleId);
+            if (!rawSave) return;
+            try {
+                const savedState = JSON.parse(rawSave);
+                for (let coordKey in savedState) {
+                    if (gridInputs[coordKey]) {
+                        gridInputs[coordKey].value = savedState[coordKey].toUpperCase();
+                    }
+                }
+                checkPuzzleCompletion();
+            } catch (e) {
+                console.error("Error loading puzzle state:", e);
+            }
+        }
+
+        // 4. Central Input Routine
+        function handleGridInput(value) {
+            if (isOverlayOpen || !currentPuzzleId) return;
+            if (!activeInput) return;
+
+            document.getElementById("try-again-banner").style.display = "none";
+
+            if (isChecking) {
+                clearCheckSlashes();
+            }
+
+            if (value === "DEL") {
+                activeInput.value = "";
+                savePuzzleProgress();
+                moveCursor(-1);
+            } else if (value === "ArrowRight") {
+                moveCursor(1);
+            } else if (value === "ArrowLeft") {
+                moveCursor(-1);
+            } else if (value === "ArrowUp") {
+                moveVerticalCursor(-1);
+            } else if (value === "ArrowDown") {
+                moveVerticalCursor(1);
+            } else {
+                activeInput.value = value.toUpperCase();
+                savePuzzleProgress();
+                moveCursor(1);
+            }
+
+            checkPuzzleCompletion();
+        }
+
+        function moveCursor(dir) {
+            const r = parseInt(activeInput.dataset.row);
+            let c = parseInt(activeInput.dataset.col);
+            
+            while (c + dir >= 0 && c + dir <= 14) { 
+                c += dir;
+                const nextKey = `${r}-${c}`;
+                if (gridInputs[nextKey]) {
+                    gridInputs[nextKey].focus();
+                    activeInput = gridInputs[nextKey];
+                    updateCluePanels(r, c);
+                    break;
+                }
+            }
+        }
+
+        function moveVerticalCursor(dir) {
+            let r = parseInt(activeInput.dataset.row);
+            const c = parseInt(activeInput.dataset.col);
+            
+            while (r + dir >= 1 && r + dir <= 10) { 
+                r += dir;
+                const nextKey = `${r}-${c}`;
+                if (gridInputs[nextKey]) {
+                    gridInputs[nextKey].focus();
+                    activeInput = gridInputs[nextKey];
+                    updateCluePanels(r, c);
+                    break;
+                }
+            }
+        }
+
+        function checkPuzzleCompletion() {
+            let complete = true;
+            let totalSquaresFilled = true;
+
+            for (let r = 0; r < 10; r++) {
+                const expectedRowString = solutionGrid[r];
+                if (!expectedRowString) continue;
+
+                for (let c = 0; c < 15; c++) {
+                    const expectedChar = expectedRowString[c];
+                    if (expectedChar === '.') continue;
+
+                    const coordKey = `${r + 1}-${c}`;
+                    const inputField = gridInputs[coordKey];
+                    const val = inputField ? inputField.value.trim().toUpperCase() : "";
+
+                    if (val === "") {
+                        totalSquaresFilled = false;
+                    }
+
+                    if (!inputField || val !== expectedChar.toUpperCase()) {
+                        complete = false;
+                    }
+                }
+            }
+
+            const winBanner = document.getElementById("win-banner");
+            const tryAgainBanner = document.getElementById("try-again-banner");
+
+            if (complete) {
+                winBanner.style.display = "block";
+                tryAgainBanner.style.display = "none";
+            } else if (totalSquaresFilled) {
+                tryAgainBanner.style.display = "block";
+                winBanner.style.display = "none";
+            } else {
+                winBanner.style.display = "none";
+                tryAgainBanner.style.display = "none";
+            }
+        }
+
+        // --- ACTIONS ENGINE ---
+        const checkBtn = document.getElementById("check-btn");
+        const revealBtn = document.getElementById("reveal-btn");
+        const resetBtn = document.getElementById("reset-btn");
+        const exitBtn = document.getElementById("exit-btn");
+        const infoBtn = document.getElementById("info-btn");
+        const rulesOverlay = document.getElementById("rules-overlay");
+        
+        checkBtn.addEventListener("click", () => {
+            if (isChecking) {
+                clearCheckSlashes();
+            } else {
+                applyCheckSlashes();
+            }
+        });
+
+        revealBtn.addEventListener("click", () => {
+            if (isChecking) clearCheckSlashes();
+            document.getElementById("try-again-banner").style.display = "none";
+            
+            for (let coordKey in gridInputs) {
+                const inputField = gridInputs[coordKey];
+                const r = parseInt(inputField.dataset.row) - 1;
+                const c = parseInt(inputField.dataset.col); 
+                
+                const expectedChar = solutionGrid[r][c];
+                if (expectedChar && expectedChar !== '.') {
+                    inputField.value = expectedChar.toUpperCase();
+                }
+            }
+            savePuzzleProgress();
+            checkPuzzleCompletion();
+        });
+
+        resetBtn.addEventListener("click", () => {
+            if (isChecking) clearCheckSlashes();
+            
+            for (let coordKey in gridInputs) {
+                gridInputs[coordKey].value = "";
+            }
+            
+            localStorage.removeItem("hexacross_save_id_" + currentPuzzleId);
+            
+            document.getElementById("win-banner").style.display = "none";
+            document.getElementById("try-again-banner").style.display = "none";
+            
+            if (activeInput) {
+                activeInput.blur();
+                activeInput = null;
+            }
+            
+            document.getElementById("row-clues-container").innerHTML = `<p class="clue-text" style="color:#aaa;">Click a square to view clues.</p>`;
+            document.getElementById("hex-clues-container").innerHTML = `<p class="clue-text" style="color:#aaa;">Click a square to view clues.</p>`;
+        });
+
+        // "New Puzzle" Exit/Router Action Routine
+        exitBtn.addEventListener("click", () => {
+            if (isChecking) clearCheckSlashes();
+
+            // Clear tracking variables
+            currentPuzzleId = null;
+            if (activeInput) activeInput.blur();
+            activeInput = null;
+
+            // Clear visual values from fields
+            for (let coordKey in gridInputs) {
+                gridInputs[coordKey].value = "";
+            }
+
+            // Reset headers and clean banners
+            document.getElementById("win-banner").style.display = "none";
+            document.getElementById("try-again-banner").style.display = "none";
+            document.getElementById("puzzle-id-banner").style.display = "none";
+            document.getElementById("row-clues-container").innerHTML = `<p class="clue-text" style="color:#aaa;">Click a square to view clues.</p>`;
+            document.getElementById("hex-clues-container").innerHTML = `<p class="clue-text" style="color:#aaa;">Click a square to view clues.</p>`;
+
+            // Toggle application viewport panels back to greeting screen
+            document.getElementById("main-layout").style.display = "none";
+            document.getElementById("action-bar").style.display = "none";
+            document.getElementById("virtual-keyboard").style.display = "none";
+            
+            document.getElementById("launcher-screen").style.display = "flex";
+            document.getElementById("puzzle-select-input").focus();
+        });
+
+        function showInstructions(e) {
+            e.stopPropagation(); 
+            rulesOverlay.style.display = "flex";
+            setTimeout(() => { isOverlayOpen = true; }, 50);
+        }
+
+        function hideInstructions() {
+            if (!isOverlayOpen) return;
+            rulesOverlay.style.display = "none";
+            isOverlayOpen = false;
+        }
+
+        infoBtn.addEventListener("click", showInstructions);
+        infoBtn.addEventListener("touchstart", showInstructions);
+
+        window.addEventListener("click", hideInstructions);
+        window.addEventListener("touchstart", hideInstructions);
+        window.addEventListener("keydown", hideInstructions);
+
+        function applyCheckSlashes() {
+            isChecking = true;
+            checkBtn.textContent = "Resume Solving";
+            checkBtn.classList.add("active-state");
+
+            for (let coordKey in gridInputs) {
+                const inputField = gridInputs[coordKey];
+                const r = parseInt(inputField.dataset.row) - 1;
+                const c = parseInt(inputField.dataset.col); 
+                
+                const expectedChar = solutionGrid[r][c];
+                const enteredChar = inputField.value.trim().toUpperCase();
+
+                if (enteredChar !== "" && enteredChar !== expectedChar) {
+                    inputField.classList.add("slashed-incorrect");
+                }
+            }
+        }
+
+        function clearCheckSlashes() {
+            isChecking = false;
+            checkBtn.textContent = "Check Puzzle";
+            checkBtn.classList.remove("active-state");
+
+            for (let coordKey in gridInputs) {
+                gridInputs[coordKey].classList.remove("slashed-incorrect");
+            }
+        }
+
+        document.getElementById("virtual-keyboard").addEventListener("pointerdown", (e) => {
+            const keyEl = e.target.closest(".key");
+            if (!keyEl) return;
+            e.preventDefault();
+            handleGridInput(keyEl.dataset.key);
+        });
+
+        window.addEventListener("keydown", (e) => {
+            if (isOverlayOpen || !currentPuzzleId) return; 
+            if (!activeInput) return;
+
+            if (e.key.length === 1 && e.key.match(/[a-z]/i)) {
+                handleGridInput(e.key.toUpperCase());
+            } 
+            else if (e.key === "Backspace" || e.key === "Delete") {
+                handleGridInput("DEL");
+            } else if (e.key === "ArrowRight") { 
+                moveCursor(1); 
+            } else if (e.key === "ArrowLeft") { 
+                moveCursor(-1); 
+            } else if (e.key === "ArrowUp") {
+                moveVerticalCursor(-1);
+            } else if (e.key === "ArrowDown") {
+                moveVerticalCursor(1);
+            }
+        });
+    </script>
+</body>
+</html>
