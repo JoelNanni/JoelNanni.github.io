@@ -1,0 +1,1179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sevens</title>
+    <style>
+        body { font-family: sans-serif; background: #121212; color: #eee; display: flex; flex-direction: column; align-items: center; overflow-x: hidden; }
+        #game-container { display: none; max-width: 400px; text-align: center; margin-top: 5px; position: relative; }
+        
+        /* Intro Page Styling */
+        #intro-container { max-width: 400px; text-align: center; margin-top: 50px; padding: 20px; }
+        #intro-container h1 { font-size: 2.5rem; color: #00d4ff; margin-bottom: 20px; }
+        #intro-container p { font-size: 1.2rem; line-height: 1.6; color: #ccc; margin-bottom: 30px; }
+        .play-btn { font-size: 1.2rem; font-weight: bold; padding: 15px 30px; cursor: pointer; background: #007bff; color: white; border: none; border-radius: 8px; transition: background 0.2s; }
+        .play-btn:hover { background: #0056b3; }
+
+        /* Modals/Overlays */
+        #load-overlay, #win-overlay, #supremo-overlay {
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.9); z-index: 100; flex-direction: column; align-items: center; justify-content: center;
+            padding: 20px; text-align: center;
+        }
+        #win-overlay h1 { color: #28a745; font-size: 3rem; margin-bottom: 10px; }
+        #win-overlay p { font-size: 1.2rem; margin-bottom: 10px; }
+        #found-summary { font-style: italic; color: #aaa; margin-bottom: 20px; max-width: 80%; line-height: 1.4; }
+
+        /* Custom styling override specifically for the Supremo alert step */
+        #supremo-overlay h1 { color: #00d4ff; font-size: 4rem; margin-bottom: 10px; text-shadow: 0 0 20px rgba(0,212,255,0.5); }
+        #supremo-overlay p { font-size: 1.4rem; margin-bottom: 25px; color: #eee; }
+
+        .grid { 
+            display: grid; 
+            grid-template-columns: repeat(4, 50px); 
+            gap: 20px; 
+            margin: 20px 25px; 
+            position: relative; 
+            z-index: 2;
+        }
+        .cell { 
+            width: 45px; height: 45px; 
+            display: flex; align-items: center; justify-content: center; 
+            font-size: 28px; font-weight: bold; cursor: pointer; user-select: none; 
+            transition: color 0.2s;
+            z-index: 3;
+            background: #1e1e1e;
+            border-radius: 8px;
+        }
+        .cell.selected { color: #00d4ff; }
+        
+        #path-svg {
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            pointer-events: none; 
+            z-index: 1;
+        }
+        #path-line {
+            fill: none;
+            stroke: #007bff;
+            stroke-width: 11;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+            opacity: 0.6;
+        }
+
+        #current-word-container {
+            width: 400px; 
+            margin: 0 auto;
+            text-align: left;
+        }
+
+        #word-list { text-align: left; background: #222; padding: 10px; border-radius: 5px; min-height: 100px; margin-top: 10px; }
+        
+        /* Two Column Layout for Words Found */
+        #list-items {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 0 20px;
+        }
+
+        .found-word { color: #28a745; margin: 5px 0; font-family: monospace; display: flex; justify-content: space-between; }
+        .score-val { color: #888; font-size: 0.9em; margin-left: 10px; }
+
+        .hint-btn, .reveal-btn, .reset-btn, .load-btn { margin: 5px; padding: 10px; cursor: pointer; background: #444; color: white; border: none; border-radius: 4px; }
+        .reset-btn { background: #007bff; }
+        .load-btn { background: #6f42c1; }
+        .reveal-btn { background: #6c757d; }
+        
+        #status-msg { height: 20px; margin-top: 10px; font-weight: bold; color: #ffc107; }
+        #puzzle-id { color: #888; margin-bottom: -10px; }
+        #total-score-display { font-size: 1.2em; color: #00d4ff; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<!-- Separate Intro Screen View -->
+<div id="intro-container">
+    <h1>Sevens</h1>
+    <p>Find as many 7-letter words in the diagram as you can by snaking from letter to adjacent letter. Each word is worth 10 points when found unaided and 7 when exploiting the "get first two letters" feature. Score 120 points (which is possible 7 at a time) to earn Supremo status. Legal snakes do not self-intersect.</p>
+    <button class="play-btn" onclick="startDailyGame()">TODAY'S GAME</button>
+</div>
+
+<!-- Supremo Milestone Celebration Overlay -->
+<div id="supremo-overlay">
+    <h1>SUPREMO!</h1>
+    <p>You have reached the ultimate rank!</p>
+    <button class="reset-btn" onclick="closeSupremoOverlay()">RETURN TO GAME</button>
+</div>
+
+<!-- Win Celebration Overlay -->
+<div id="win-overlay">
+    <h1>PERFECT!</h1>
+    <p>No more left:</p>
+    <div id="found-summary"></div>
+    <div id="final-score">Final Score: 0</div>
+    <div style="margin-top: 25px;">
+        <button class="reset-btn" onclick="closeWinAndRestart()">RESET GAME</button>
+    </div>
+</div>
+
+<!-- Hidden Game Container (Shows after tracking button click) -->
+<div id="game-container">
+    <h2>Sevens</h2>
+    
+    <div id="total-score-display">Score: 0</div>
+
+    <div id="current-word-container">
+        <h4 id="current-word">Guess: <span></span></h4>
+    </div>
+
+    <div id="grid" class="grid">
+        <svg id="path-svg">
+            <polyline id="path-line" points="" />
+        </svg>
+    </div>
+    
+    <div id="word-list">
+        <strong>Words Found (0):</strong>
+        <div id="list-items"></div>
+    </div>
+
+    <div style="margin-top:20px;">
+        <div id="status-msg"></div>
+        
+        <button class="hint-btn" onclick="provideHint()">GET FIRST 2 LETTERS</button>
+        <button class="reveal-btn" onclick="revealWord()">REVEAL A WORD</button>
+        <br>
+        <button class="reset-btn" onclick="setupNewGame()">RESET GAME</button>
+        <button onclick="loadArchivedGame()">Load Archived Game</button>
+    </div>
+</div>
+
+<script>
+    const gameData = 
+[
+{
+"id":260517,
+"grid": [["D", "R", "T", "E"],["E", "P", "I", "C"],["S", "V", "E", "R"],["A", "E", "T", "N"]],
+"targetWords": ["DESPITE", "RECEIVE", "PREVENT", "RESPECT", "DERIVES", "RECIPES", "SERPENT", "RECEIPT", "ASPIRED", "DEPRIVE", "RESPITE", "REVERIE", "TRICEPS", "ASEPTIC", "RIVETER", "RESPIRE", "REPRICE", "DERIVER"]
+},
+{
+"id":260518,
+"grid": [["L", "N", "O", "F"],["A", "G", "I", "R"],["E", "M", "E", "P"],["T", "A", "U", "S"]],
+"targetWords": ["FOREIGN", "SUPREME", "SEMINAL", "FOREMAN", "TEAMING", "PRIMATE", "FRINGES", "IGNORES", "FIREMAN", "ANIMATE", "PREGAME", "PRESUME", "FROGMAN", "SEMIPRO", "MEANIES", "SPRINGE", "REAMING", "MANGIER"]
+},
+{
+"id":260519,
+"grid": [["E", "N", "E", "S"],["I", "L", "G", "E"],["A", "N", "A", "R"],["T", "T", "G", "V"]],
+"targetWords": ["SERVANT", "ELEGANT", "REGATTA", "SEALING", "VALIANT", "TAGLINE", "ENLARGE", "REGALIA", "GANGLIA", "TANAGER", "REELING", "TANGLES", "SEALANT", "GRANGES", "RATTAIL", "EAGLING", "GARGLES", "ALIENEE"]
+},
+{
+"id":260520,
+"grid": [["G", "T", "A", "E"],["N", "S", "R", "V"],["E", "I", "T", "E"],["V", "C", "R", "P"]],
+"targetWords": ["PERCENT", "RETREAT", "REVERSE", "STARTER", "REPRISE", "REPRINT", "TASTING", "STARING", "EVASIVE", "ERASING", "REVERTS", "REVERIE", "STRIVEN", "RETRIES", "TRISECT", "CRETINS", "REPRICE", "ARTIEST"]
+},
+{
+"id":260521,
+"grid": [["C", "R", "T", "I"],["E", "R", "U", "S"],["S", "M", "A", "T"],["I", "T", "P", "E"]],
+"targetWords": ["RECRUIT", "TRUMPET", "STEAMER", "RESTART", "STATURE", "PASTURE", "IMPETUS", "RAPTURE", "ARTISTE", "MATURES", "IMPARTS", "SITUATE", "SERRATE", "SURMISE", "CREMATE", "RESTATE", "TEATIME", "CRUMPET"]
+},
+{
+"id":260522,
+"grid": [["A", "E", "A", "N"],["C", "R", "T", "S"],["T", "O", "A", "T"],["M", "P", "R", "C"]],
+"targetWords": ["PROTECT", "COMPACT", "CREATOR", "ATTRACT", "REACTOR", "COMPARE", "COASTER", "TRACTOR", "TOASTER", "RETORTS", "TARTANS", "CARPORT", "ROASTER", "PROTEAN", "AERATOR", "RATTANS", "RATTRAP", "PRORATE"]
+},
+{
+"id":260523,
+"grid": [["E", "L", "A", "S"],["M", "P", "N", "I"],["A", "R", "T", "N"],["G", "E", "A", "C"]],
+"targetWords": ["PAINTER", "PARTIAL", "MARTIAL", "PAGEANT", "MARTINS", "RAMPANT", "PLANTER", "ARTISAN", "RETINAL", "INTERNS", "PREGAME", "GAMELAN", "CARAMEL", "MELANIN", "PLANTAR", "CANTINA", "TRAMPLE", "RETINAS"]
+},
+{
+"id":260524,
+"grid": [["T", "R", "O", "N"],["H", "W", "E", "T"],["C", "E", "R", "X"],["T", "A", "D", "E"]],
+"targetWords": ["RETREAT", "EXTRACT", "NOWHERE", "HECTARE", "THROWER", "REWROTE", "RETRACT", "CHEERED", "THEREON", "THERETO", "RETRACE", "TOWERED", "RETREAD", "WHEREON", "ENTREAT", "WHERETO", "TOWHEAD", "HEARTEN"]
+},
+{
+"id":260525,
+"grid": [["D", "E", "C", "K"],["F", "I", "T", "I"],["E", "S", "E", "N"],["S", "A", "L", "R"]],
+"targetWords": ["EASTERN", "DISEASE", "FITNESS", "DEFICIT", "DEITIES", "KINETIC", "SEASIDE", "ELASTIC", "CISTERN", "ENTICED", "DICKIES", "SEASICK", "EIDETIC", "FEASTER", "FEASTED", "CINEAST", "ICINESS", "ICKIEST"]
+},
+{
+"id":260526,
+"grid": [["A", "I", "F", "E"],["N", "M", "L", "T"],["E", "G", "A", "C"],["R", "N", "I", "H"]],
+"targetWords": ["MACHINE", "REMATCH", "IMAGINE", "LINEMAN", "FLAMING", "ETCHING", "TAGLINE", "REGALIA", "ANIMATE", "CALMING", "CHANGER", "HANGMAN", "GREMLIN", "HANGMEN", "FLAGMAN", "CLINGER", "FLAGMEN", "FLINGER"]
+},
+{
+"id":260527,
+"grid": [["L", "T", "I", "N"],["A", "M", "S", "N"],["R", "E", "E", "A"],["U", "T", "R", "L"]],
+"targetWords": ["TRANSIT", "NEAREST", "RETREAT", "MINERAL", "STARTER", "SEMINAL", "SEMINAR", "RESTART", "MINARET", "MARTENS", "SMARTER", "MATINEE", "LAMINAR", "MELANIN", "TEATIME", "ERMINES", "SMARTEN", "TUREENS"]
+},
+{
+"id":260528,
+"grid": [["E", "S", "R", "E"],["N", "U", "C", "W"],["A", "I", "R", "R"],["L", "A", "T", "E"]],
+"targetWords": ["TERRAIN", "RECRUIT", "RETAINS", "CURTAIN", "RECITAL", "REWRITE", "RETINAL", "AIRCREW", "RETINUE", "INSURER", "RETRIAL", "CURTAIL", "LATRINE", "RECITER", "RETRAIN", "UNSCREW", "TERRINE", "CRETINS"]
+},
+{
+"id":260529,
+"grid": [["S", "P", "I", "R"],["E", "T", "E", "T"],["R", "I", "U", "I"],["A", "L", "N", "G"]],
+"targetWords": ["TITULAR", "RESTING", "REUNITE", "RAINIER", "RETINUE", "RESPITE", "RETRIAL", "RETIRES", "NITRITE", "IGNITES", "PETUNIA", "RETRAIN", "IGNITER", "TINIEST", "RESPIRE", "TIPSTER", "PIETIES", "SPITING"]
+},
+{
+"id":260530,
+"grid": [["N", "E", "G", "N"],["D", "T", "A", "E"],["G", "O", "R", "S"],["C", "A", "O", "P"]],
+"targetWords": ["SENATOR", "PORTAGE", "ENDORSE", "REAGENT", "GARAGES", "SPORTED", "NEGATED", "PROTEGE", "CORTEGE", "ROSEATE", "PROTEAN", "NEGATOR", "CORSAGE", "PORTEND", "DOGCART", "COARSEN", "GARAGED", "DOTAGES"]
+},
+{
+"id":260531,
+"grid": [["E", "E", "S", "Y"],["A", "T", "D", "L"],["I", "N", "A", "A"],["G", "R", "A", "M"]],
+"targetWords": ["GRANTED", "GRANITE", "SEATING", "ANALYST", "MALARIA", "MARITAL", "ADAMANT", "MANDALA", "MANATEE", "SLANTED", "GRANTEE", "GRANDEE", "GRANDLY", "TIRADES", "SLATING", "INGRATE", "GRANDAM", "LARIATS"]
+},
+{
+"id":260601,
+"grid": [["E", "A", "T", "E"],["M", "I", "N", "A"],["S", "O", "L", "D"],["R", "E", "P", "E"]],
+"targetWords": ["MANDATE", "DEPOSIT", "PERSONA", "ISOLATE", "RELIANT", "ANIMATE", "TAILORS", "EMAILED", "ROMAINE", "EMANATE", "ONETIME", "ELATION", "MAILERS", "REPLANT", "DEPLORE", "DEPLANE", "RESOLED", "ENAMORS"]
+},
+{
+"id":260602,
+"grid": [["H", "I", "L", "Y"],["S", "R", "A", "T"],["T", "E", "U", "S"],["U", "R", "N", "O"]],
+"targetWords": ["RETURNS", "NEUTRAL", "STARTER", "TURNOUT", "TREASON", "REALIST", "STYLISH", "SENSUAL", "LISTENS", "STYLIST", "TSARIST", "NURTURE", "RETRIAL", "STRATUS", "TURNERS", "NOURISH", "SHIATSU", "SOUREST"]
+},
+{
+"id":260603,
+"grid": [["R", "V", "I", "G"],["E", "S", "N", "E"],["R", "E", "C", "T"],["P", "U", "R", "A"]],
+"targetWords": ["PRESENT", "SERVING", "RECEIVE", "CAREERS", "INVERSE", "SERPENT", "SINCERE", "CURSIVE", "CURSING", "RESCUER", "VISCERA", "PENSIVE", "ENTREES", "EVINCES", "REVISER", "ARCSINE", "PURSING", "SECURER"]
+},
+{
+"id":260604,
+"grid": [["T", "R", "A", "M"],["I", "N", "G", "T"],["S", "A", "R", "E"],["P", "H", "C", "P"]],
+"targetWords": ["MANAGER", "PERHAPS", "TRANSIT", "CHASING", "MARTINS", "SPARTAN", "NITRATE", "ARTISAN", "CARNAGE", "CHAGRIN", "PHASING", "TANAGER", "ERASING", "CHANGER", "MARINAS", "GARNISH", "TARNISH", "INGRATE"]
+},
+{
+"id":260605,
+"grid": [["N", "O", "L", "E"],["I", "S", "T", "D"],["C", "T", "A", "P"],["S", "E", "L", "O"]],
+"targetWords": ["STATION", "SECTION", "INSTEAD", "SETTLED", "PLASTIC", "CITADEL", "LATTICE", "ELASTIC", "PALETTE", "STAPLES", "PLATTED", "TADPOLE", "PLEATED", "ELATION", "STATICS", "INSTATE", "NOTATES", "STALEST"]
+},
+{
+"id":260606,
+"grid": [["L", "M", "C", "S"],["I", "A", "E", "H"],["T", "R", "G", "A"],["E", "N", "I", "D"]],
+"targetWords": ["READING", "HEADING", "DIAGRAM", "IMAGINE", "INERTIA", "SHADING", "CHAGRIN", "AIRTIME", "TRACHEA", "LATRINE", "MIRAGES", "CHEATER", "ENRAGES", "GRIMACE", "INGRATE", "HAIRNET", "HEARTEN", "TRIAGES"]
+},
+{
+"id":260607,
+"grid": [["D", "S", "S", "L"],["I", "E", "P", "A"],["V", "R", "A", "P"],["O", "E", "L", "Y"]],
+"targetWords": ["SEVERAL", "PROVIDE", "PASSIVE", "OVERLAP", "APPROVE", "APPAREL", "RELAPSE", "OVERLAY", "ELAPSED", "DEPRIVE", "SLAPPED", "REAPPLY", "REVISES", "ELAPSES", "SLAPPER", "APPRISE", "SPARELY", "OVERPAY"]
+},
+{
+"id":260608,
+"grid": [["H", "G", "N", "N"],["T", "S", "I", "O"],["P", "U", "L", "D"],["O", "B", "R", "E"]],
+"targetWords": ["OUTSIDE", "PUBLISH", "BUILDER", "BOULDER", "DELIGHT", "RULINGS", "INSURED", "DISTURB", "UPSILON", "PULSING", "LONGISH", "RELIGHT", "REDOING", "BLIGHTS", "PURLING", "OBLONGS", "PURLOIN", "DONNISH"]
+},
+{
+"id":260609,
+"grid": [["A", "D", "O", "P"],["E", "V", "I", "L"],["S", "A", "E", "L"],["B", "R", "B", "Y"]],
+"targetWords": ["DEVELOP", "DIVERSE", "ADVERSE", "BELOVED", "PLEASED", "BRAILLE", "BRAVELY", "ADVERBS", "LOVABLE", "PLOVERS", "BRAVADO", "LIVABLE", "BARBELL", "PLIABLE", "OVERSEA", "RELIVES", "RELIVED", "LOVABLY"]
+},
+{
+"id":260610,
+"grid": [["Y", "I", "N", "O"],["T", "E", "M", "A"],["S", "I", "D", "E"],["M", "C", "H", "R"]],
+"targetWords": ["AMNESTY", "CHEMIST", "CHIMNEY", "NOMADIC", "SIDEMAN", "AMENITY", "ANIMISM", "ONETIME", "HEADMEN", "ANIMIST", "SIDEMEN", "MEANEST", "SCHEMED", "CHEMISE", "READIES", "MEANIES", "READMIT", "MISTIME"]
+},
+{
+"id":260611,
+"grid": [["R", "E", "U", "S"],["I", "P", "S", "L"],["L", "M", "T", "E"],["I", "E", "A", "T"]],
+"targetWords": ["EMPRESS", "IMPLIES", "IMPULSE", "EMPIRES", "PRIMATE", "IMPRESS", "UPSTATE", "ATELIER", "REPULSE", "REPLETE", "STAMPER", "PUERILE", "RESTATE", "MILIEUS", "IMPERIL", "AMPULES", "SEAMIER", "LIMPEST"]
+},
+{
+"id":260612,
+"grid": [["V", "E", "R", "Y"],["N", "I", "T", "O"],["O", "C", "S", "S"],["M", "A", "U", "R"]],
+"targetWords": ["VICTORY", "MONITOR", "CONVERT", "AUCTION", "EROSION", "COASTER", "MASTERY", "SUCTION", "CURSIVE", "EROTICA", "CURSORY", "INVERTS", "MOISTER", "MOISTEN", "SUASION", "RUSTICS", "MONISTS", "RUSTIER"]
+},
+{
+"id":260613,
+"grid": [["P", "U", "N", "E"],["R", "E", "T", "I"],["W", "E", "T", "L"],["G", "S", "A", "P"]],
+"targetWords": ["PATIENT", "PLASTER", "SERPENT", "REUNITE", "SALIENT", "RETINUE", "SWEATER", "GESTALT", "TENURES", "PLATTER", "PETITES", "SWEETIE", "SWEETEN", "PRETEST", "SALTINE", "REPUTES", "ALIENEE", "PASTEUP"]
+},
+{
+"id":260614,
+"grid": [["R", "T", "N", "R"],["D", "O", "C", "E"],["N", "I", "S", "T"],["L", "S", "E", "A"]],
+"targetWords": ["EASTERN", "DISEASE", "DIOCESE", "CONSIST", "DISSENT", "DISCERN", "CESSION", "CISTERN", "RESCIND", "STENCIL", "LIONESS", "DISSECT", "ROSEATE", "RECOILS", "ONESIES", "ROISTER", "TONIEST", "TOCSINS"]
+},
+{
+"id":260615,
+"grid": [["E", "M", "R", "S"],["D", "S", "O", "T"],["A", "N", "I", "C"],["G", "E", "L", "A"]],
+"targetWords": ["ACTIONS", "COINAGE", "STORMED", "SORTING", "GENOMES", "DEMONIC", "ANGELIC", "GNOSTIC", "LACTOSE", "CLEANSE", "MORTISE", "DEMOING", "ASOCIAL", "CORSAGE", "EMOTING", "CITRONS", "STOICAL", "ENDMOST"]
+},
+{
+"id":260616,
+"grid": [["C", "E", "N", "T"],["T", "N", "R", "E"],["U", "O", "I", "R"],["O", "C", "H", "S"]],
+"targetWords": ["CONTENT", "CONCERT", "CENTERS", "CONCERN", "CONNECT", "SHORTER", "COUNTER", "CORNERS", "SINCERE", "TORRENT", "RENTERS", "CENTRIC", "COTERIE", "REROUTE", "RETOUCH", "SHOUTER", "TROUNCE", "TERRINE"]
+},
+{
+"id":260617,
+"grid": [["D", "A", "M", "Y"],["N", "U", "B", "L"],["T", "O", "B", "L"],["R", "S", "E", "R"]],
+"targetWords": ["TROUBLE", "REBOUND", "ROTUNDA", "ROSEBUD", "STUMBLE", "BELLMAN", "TUNABLE", "TUMBLER", "NOBLEST", "STUBBLE", "TUMBLES", "RESOUND", "OUTSELL", "DABBLES", "BAUBLES", "DABBLER", "BUMBLER", "STUBBLY"]
+},
+{
+"id":260618,
+"grid": [["A", "L", "E", "G"],["I", "R", "O", "N"],["P", "S", "I", "M"],["R", "E", "N", "T"]],
+"targetWords": ["RAISING", "PROMISE", "MINERAL", "PENSION", "ARISING", "INSPIRE", "EPSILON", "RENTING", "REPRINT", "LENIENT", "AILERON", "ELISION", "LEONINE", "IRONIES", "SIRLOIN", "RESPIRE", "MONGERS", "SPRINGE"]
+},
+{
+"id":260619,
+"grid": [["S", "E", "E", "G"],["H", "T", "N", "A"],["U", "O", "R", "T"],["T", "P", "U", "M"]],
+"targetWords": ["STORAGE", "STRANGE", "TURNOUT", "EARNEST", "HORNETS", "OUTRAGE", "SHUTOUT", "PORTAGE", "MUTANTS", "EARTHEN", "SHORTEN", "STRATUM", "TANTRUM", "MUTAGEN", "GARNETS", "PORTENT", "PROTEAN", "TONEARM"]
+},
+{
+"id":260620,
+"grid": [["D", "R", "I", "S"],["A", "W", "O", "P"],["E", "T", "O", "E"],["D", "S", "U", "M"]],
+"targetWords": ["PIRATES", "POSTWAR", "STEWARD", "OUTWARD", "ISOTOPE", "MUSTARD", "AWESOME", "DROPOUT", "WIPEOUT", "PIRATED", "RIOTOUS", "TEAROOM", "RIPOSTE", "SPOUTED", "DEWDROP", "ROOSTED", "OUTWEAR", "TOWROPE"]
+},
+{
+"id":260621,
+"grid": [["E", "A", "S", "P"],["T", "N", "D", "E"],["G", "A", "R", "E"],["E", "R", "V", "A"]],
+"targetWords": ["AVERAGE", "SERVANT", "REGARDS", "ARRANGE", "PEERAGE", "TAVERNS", "VERANDA", "TANAGER", "GRANDER", "DRAGNET", "ERRANDS", "VERDANT", "GRANDEE", "ENGRAVE", "SERRATE", "RAVAGER", "GRADATE", "DERANGE"]
+},
+{
+"id":260622,
+"grid": [["P", "E", "S", "S"],["R", "L", "T", "H"],["A", "T", "S", "I"],["E", "C", "Y", "P"]],
+"targetWords": ["ACTRESS", "SCARLET", "THISTLE", "PRELATE", "STEALTH", "CARPETS", "SCATTER", "HITLESS", "HIPSTER", "STARLET", "RATTLES", "ITERATE", "STEALER", "TYPISTS", "SPITTLE", "ARTLESS", "PRATTLE", "STALEST"]
+},
+{
+"id":260623,
+"grid": [["T", "S", "I", "T"],["A", "R", "S", "C"],["P", "E", "K", "E"],["R", "F", "L", "Y"]],
+"targetWords": ["REFLECT", "REPRISE", "PERSIST", "TSARIST", "PRICKLY", "TRICKLE", "SICKLES", "STARKLY", "KEYLESS", "SEASICK", "STARKER", "TICKERS", "TICKLES", "TICKLER", "PRICKLE", "TRISECT", "PASSKEY", "REPRICE"]
+},
+{
+"id":260624,
+"grid": [["N", "G", "N", "A"],["E", "I", "L", "D"],["M", "A", "C", "E"],["E", "T", "S", "M"]],
+"targetWords": ["CLIMATE", "DECLINE", "CINEMAS", "NEGLECT", "TEAMING", "SCALING", "STAMINA", "ANIMATE", "MINGLED", "MELANIN", "EMAILED", "ALANINE", "MELANGE", "MILDEST", "MINGLES", "DANGLES", "DECLAIM", "CINEAST"]
+},
+{
+"id":260625,
+"grid": [["R", "E", "C", "P"],["M", "A", "L", "O"],["C", "I", "N", "S"],["R", "A", "M", "I"]],
+"targetWords": ["SIMILAR", "REMAINS", "ANIMALS", "MINIMAL", "CERAMIC", "CRIMSON", "OCEANIC", "CONICAL", "RECLAIM", "CRANIAL", "RAILCAR", "POLEMIC", "LAMINAR", "LACONIC", "CAIMANS", "CLAIMER", "MINICAM", "MISNAME"]
+},
+{
+"id":260626,
+"grid": [["P", "R", "M", "E"],["E", "U", "T", "I"],["C", "P", "S", "C"],["E", "L", "A", "Y"]],
+"targetWords": ["MUSICAL", "CAPTURE", "PLASTIC", "PERMITS", "PASTURE", "ELASTIC", "UPSCALE", "REPLAYS", "PASTIME", "PRECEPT", "RECUSAL", "PERUSAL", "CLASPER", "PERMUTE", "SCALPER", "CITRUSY", "MISPLAY", "PREPAYS"]
+},
+{
+"id":260627,
+"grid": [["P", "E", "R", "T"],["A", "P", "S", "U"],["G", "N", "I", "H"],["L", "E", "T", "C"]],
+"targetWords": ["RUSHING", "LEISURE", "ETCHING", "SHINGLE", "REAGENT", "SNAPPER", "RESPITE", "SPANIEL", "SINGLET", "REAPING", "CHIPPER", "SHIPPER", "SPANGLE", "HIPPEST", "NIPPERS", "ENTHUSE", "TIPPERS", "NAPPERS"]
+},
+{
+"id":260628,
+"grid": [["T", "E", "N", "S"],["K", "A", "R", "M"],["N", "I", "T", "I"],["R", "E", "M", "E"]],
+"targetWords": ["RETREAT", "TRAINER", "NITRATE", "EMIRATE", "TANKERS", "IMITATE", "MINARET", "EMERITA", "AIRTIME", "RETAKEN", "TERMITE", "KERATIN", "RETRAIN", "TINKERS", "TRIREME", "TEATIME", "TRINKET", "EMERITI"]
+},
+{
+"id":260629,
+"grid": [["R", "S", "C", "A"],["E", "I", "R", "P"],["N", "A", "P", "O"],["C", "I", "L", "L"]],
+"targetWords": ["ARSENAL", "ARSENIC", "RAINIER", "PROPANE", "PICNICS", "CRAPPIE", "CALORIE", "CALORIC", "POPLARS", "PORCINE", "PLAINER", "SCARIER", "OPALINE", "PRALINE", "PORCINI", "ARCSINE", "APPRISE", "PLANERS"]
+},
+{
+"id":260630,
+"grid": [["S", "L", "E", "R"],["I", "M", "G", "O"],["N", "A", "E", "P"],["E", "T", "R", "C"]],
+"targetWords": ["CERTAIN", "OPERATE", "TRAILER", "LINEAGE", "INTEGER", "RELIANT", "ENTAILS", "TAGLINE", "PREGAME", "PERTAIN", "GREMLIN", "CREAMER", "OPERANT", "ENAMELS", "MINTAGE", "RETAILS", "CREMATE", "SMARTEN"]
+},
+{
+"id":260701,
+"grid": [["N", "O", "N", "D"],["V", "E", "D", "O"],["D", "I", "R", "U"],["N", "T", "S", "E"]],
+"targetWords": ["DIVERSE", "RESIDED", "VENDORS", "ENDORSE", "OVERDUE", "NITROUS", "OVERUSE", "ENDURES", "ONEROUS", "ENVIRON", "DIVERTS", "INTRUDE", "RESTIVE", "STRIVEN", "TRODDEN", "DEVISER", "DUSTIER", "DOUREST"]
+},
+{
+"id":260702,
+"grid": [["M", "P", "N", "S"],["M", "E", "L", "I"],["N", "A", "D", "T"],["N", "U", "R", "Y"]],
+"targetWords": ["DENSITY", "PENALTY", "UNNAMED", "MARTINS", "LINEMAN", "DILEMMA", "PLENARY", "DUALITY", "SIDEMAN", "AMENITY", "RUNNELS", "MAUDLIN", "TRAMPLE", "ANNELID", "TRAMMEL", "DAMPENS", "TRAMPED", "PLAUDIT"]
+},
+{
+"id":260703,
+"grid": [["W", "A", "S", "E"],["T", "R", "E", "S"],["A", "D", "E", "T"],["I", "N", "V", "O"]],
+"targetWords": ["TRAINED", "VETERAN", "OVERSAW", "ADVERSE", "OVERSEE", "INVERSE", "TRAINEE", "TENDERS", "DESSERT", "DEVOTEE", "DATASET", "DEVOTES", "REDNESS", "SARDINE", "WRESTED", "SENDERS", "TASERED", "OVEREAT"]
+},
+{
+"id":260704,
+"grid": [["E", "R", "S", "T"],["P", "T", "U", "R"],["M", "A", "N", "D"],["I", "L", "E", "L"]],
+"targetWords": ["STUDENT", "TSUNAMI", "IMPETUS", "PRUDENT", "IMPALED", "LIMPETS", "ENTRUST", "STAMPER", "DENTURE", "TRUNDLE", "STRUDEL", "TAMPERS", "DUSTMAN", "LEAPERS", "DUSTPAN", "PETALED", "IMPANEL", "SUNLAMP"]
+},
+{
+"id":260705,
+"grid": [["G", "E", "V", "C"],["N", "E", "L", "O"],["A", "T", "R", "L"],["P", "P", "A", "S"]],
+"targetWords": ["COLLEGE", "GENERAL", "OVERALL", "PREVENT", "PATROLS", "OVERLAP", "APPROVE", "VENTRAL", "APPAREL", "RENTALS", "COLLEEN", "PATELLA", "CORTEGE", "COLLATE", "PAROLEE", "ALLOVER", "TANGELO", "PAELLAS"]
+},
+{
+"id":260706,
+"grid": [["S", "T", "E", "T"],["A", "S", "U", "R"],["T", "E", "O", "P"],["H", "E", "R", "T"]],
+"targetWords": ["THEATER", "STATUTE", "TRUSTEE", "STATURE", "POSTURE", "TROUSER", "PRESETS", "ROSEATE", "POETESS", "RESTATE", "PREHEAT", "TESTATE", "PRETEST", "RETESTS", "THEREAT", "TREATER", "PRESORT", "REHEATS"]
+},
+{
+"id":260707,
+"grid": [["I", "C", "L", "E"],["E", "T", "R", "E"],["P", "S", "A", "D"],["P", "I", "N", "G"]],
+"targetWords": ["ARTICLE", "CREATES", "CITADEL", "LEASING", "DRASTIC", "SPECTRA", "INSPECT", "EPISTLE", "SNIPPET", "ERASING", "CLEANSE", "STANDER", "GNARLED", "RASPING", "SNARLED", "STANDEE", "TRAIPSE", "TIEPINS"]
+},
+{
+"id":260708,
+"grid": [["S", "I", "R", "E"],["N", "O", "T", "D"],["L", "A", "I", "A"],["H", "C", "R", "E"]],
+"targetWords": ["CREATED", "EDITION", "RADICAL", "CREATOR", "CHARIOT", "ISOLATE", "RATIONS", "RETINAL", "CLARION", "RADIATE", "EROTICA", "CHARADE", "RADIANS", "AERATED", "SOLARIA", "AERATOR", "SNORTED", "CITRONS"]
+},
+{
+"id":260709,
+"grid": [["E", "L", "I", "C"],["G", "N", "S", "T"],["R", "A", "S", "E"],["B", "O", "D", "N"]],
+"targetWords": ["ORGANIC", "GRANITE", "GROSSED", "NESTING", "BOASTED", "ROASTED", "BROADEN", "LISTENS", "ENLISTS", "ANGELIC", "INROADS", "BOSSING", "BADNESS", "DESTINE", "SESTINA", "BASTING", "GLISTEN", "ENGROSS"]
+},
+{
+"id":260710,
+"grid": [["F", "R", "U", "M"],["M", "I", "E", "S"],["E", "P", "S", "N"],["X", "R", "E", "C"]],
+"targetWords": ["PREMIER", "EXPRESS", "EMPRESS", "EXPENSE", "PREMIUM", "PREMISE", "REISSUE", "ENSURES", "EMPIRES", "IMPRESS", "CENSURE", "EXPIRES", "FISSURE", "MESSIER", "REPRESS", "PRESSER", "SURMISE", "RESPIRE"]
+},
+{
+"id":260711,
+"grid": [["T", "O", "G", "L"],["P", "N", "I", "D"],["A", "S", "E", "R"],["T", "S", "U", "C"]],
+"targetWords": ["PASSING", "PASSION", "DISTANT", "ASSURED", "INSURED", "TANGIER", "CESSION", "REUSING", "LIONESS", "TONSURE", "TOPSIDE", "PANSIES", "DESPOIL", "CUSSING", "APTNESS", "PATSIES", "TANSIES", "TONIEST"]
+},
+{
+"id":260712,
+"grid": [["E", "T", "P", "C"],["E", "R", "O", "U"],["D", "I", "T", "R"],["L", "A", "S", "T"]],
+"targetWords": ["OUTSIDE", "AIRPORT", "EDITORS", "DISRUPT", "CORSAIR", "CORDIAL", "CURTAIL", "STORIED", "DISTORT", "ASTRIDE", "RETORTS", "DETOURS", "COTERIE", "PROTIST", "TREETOP", "DIOPTER", "DILATOR", "STAIDER"]
+},
+{
+"id":260713,
+"grid": [["Y", "F", "S", "D"],["P", "L", "E", "T"],["H", "A", "T", "A"],["E", "C", "U", "E"]],
+"targetWords": ["PLATEAU", "PALETTE", "CHATEAU", "PLATTED", "STATELY", "LETTUCE", "ACUTELY", "LACTATE", "ATTACHE", "CHATTEL", "CHALETS", "DEFLATE", "ACTUATE", "CHATTED", "SLATTED", "CUTLETS", "CAPLETS", "ACUTEST"]
+},
+{
+"id":260714,
+"grid": [["S", "N", "I", "A"],["S", "E", "L", "M"],["C", "T", "R", "L"],["I", "H", "A", "I"]],
+"targetWords": ["ILLNESS", "AIRLINE", "MINERAL", "STELLAR", "INSTALL", "RALLIES", "RECITAL", "INSERTS", "AIRMAIL", "TALLIES", "HITLESS", "AIMLESS", "AIRLESS", "STALLER", "ARMLESS", "ARTLESS", "RATLINE", "HATLESS"]
+},
+{
+"id":260715,
+"grid": [["S", "U", "N", "G"],["L", "F", "I", "A"],["E", "I", "C", "T"],["D", "K", "T", "E"]],
+"targetWords": ["SUICIDE", "UNIFIED", "DEFICIT", "FITTING", "SULFIDE", "EDIFICE", "INFLICT", "TACTILE", "LUNATIC", "SLICING", "TETANUS", "NICKELS", "INFIDEL", "SULFITE", "GAINFUL", "FLICKED", "DEICING", "SLICKED"]
+},
+{
+"id":260716,
+"grid": [["G", "I", "M", "D"],["L", "N", "E", "T"],["A", "C", "E", "N"],["S", "L", "I", "S"]],
+"targetWords": ["ANCIENT", "DECLINE", "LICENSE", "EMINENT", "SALIENT", "NASCENT", "INCLINE", "INCENSE", "SEEMING", "TENSILE", "LENIENT", "SCENTED", "TEEMING", "GLANCES", "MENACES", "GLANCED", "ALIMENT", "ENLACES"]
+},
+{
+"id":260717,
+"grid": [["T", "E", "L", "Y"],["S", "P", "I", "T"],["E", "A", "B", "R"],["D", "L", "E", "F"]],
+"targetWords": ["RELEASE", "LIBERTY", "FERTILE", "DESPAIR", "TRIPLES", "RELAPSE", "ELAPSED", "TRIPLET", "BIPEDAL", "PLIABLE", "FEBRILE", "FRIABLE", "TREBLES", "TREBLED", "TRIABLE", "LIBELED", "ALERTLY", "BALDEST"]
+},
+{
+"id":260718,
+"grid": [["E", "C", "L", "Y"],["I", "A", "K", "P"],["R", "S", "E", "N"],["B", "T", "R", "A"]],
+"targetWords": ["EASTERN", "REPLACE", "BRACKET", "PLASTER", "TRACKER", "BRACKEN", "CISTERN", "RETRIAL", "RACKETS", "RICKETS", "RETRACE", "BRISKLY", "STREAKY", "BRISKET", "BRISKER", "TREACLY", "ECLAIRS", "RANKEST"]
+},
+{
+"id":260719,
+"grid": [["E", "L", "G", "N"],["T", "D", "I", "S"],["S", "T", "R", "O"],["P", "I", "E", "B"]],
+"targetWords": ["LETTERS", "LETTING", "SINGLED", "SORTING", "STERILE", "BRITTLE", "STEROID", "ELITIST", "BRISTLE", "SINGLET", "RIPTIDE", "RINGLET", "SPITTLE", "BROILED", "DISROBE", "SORBETS", "SPITING", "TINGLED"]
+},
+{
+"id":260720,
+"grid": [["M", "Y", "L", "B"],["T", "S", "A", "E"],["U", "R", "I", "T"],["P", "E", "H", "S"]],
+"targetWords": ["LEATHER", "LEISURE", "STRAITS", "STARTUP", "ATHEIST", "PERSIST", "ATHEISM", "TSARIST", "THIRSTY", "BATHERS", "STRIATE", "PERUSAL", "BEARISH", "LATHERS", "BLATHER", "SLATHER", "TRITELY", "IRATELY"]
+},
+{
+"id":260721,
+"grid": [["E", "N", "L", "S"],["T", "G", "A", "P"],["E", "R", "N", "D"],["V", "A", "T", "A"]],
+"targetWords": ["AVERAGE", "PAGEANT", "ETERNAL", "LANTERN", "SPARTAN", "VANDALS", "PLANTER", "ENTRANT", "ENLARGE", "GRANDPA", "VERANDA", "TANAGER", "PLANTAR", "ANDANTE", "ENGRAVE", "TEARGAS", "ENTREAT", "ENTRAPS"]
+},
+{
+"id":260722,
+"grid": [["I", "N", "T", "H"],["P", "R", "E", "C"],["O", "M", "T", "L"],["I", "S", "A", "R"]],
+"targetWords": ["STRETCH", "THERMAL", "CHEMIST", "REMATCH", "IMPRINT", "HEROISM", "SMARTER", "RATCHET", "STARLET", "LATRINE", "RIPOSTE", "MOISTER", "PORTENT", "THERMOS", "POSTMEN", "MATCHER", "MOISTEN", "SMARTEN"]
+},
+{
+"id":260723,
+"grid": [["F", "E", "N", "T"],["C", "O", "I", "A"],["O", "S", "L", "G"],["T", "R", "E", "A"]],
+"targetWords": ["EROSION", "COINAGE", "FOLIAGE", "REALIST", "RELIANT", "ENTAILS", "TAGLINE", "TORSION", "COOLANT", "AEROSOL", "COOLEST", "GELATIN", "COOLERS", "SEALANT", "OREGANO", "ELATION", "FOOTSIE", "STOOLIE"]
+},
+{
+"id":260724,
+"grid": [["Y", "T", "F", "P"],["I", "A", "I", "O"],["G", "N", "M", "R"],["U", "E", "T", "E"]],
+"targetWords": ["FORMING", "TRINITY", "UNIFORM", "INTERIM", "FATIGUE", "FOREMAN", "POINTER", "FIREMAN", "TERMINI", "EMERITA", "FIREMEN", "AMENITY", "ROMAINE", "FAINTER", "TERMING", "FOREMEN", "EMERITI", "PITYING"]
+},
+{
+"id":260725,
+"grid": [["V", "L", "B", "A"],["E", "O", "V", "D"],["S", "E", "N", "I"],["I", "R", "D", "G"]],
+"targetWords": ["DIVERSE", "EVOLVED", "INVOLVE", "RESOLVE", "ADVERSE", "SOLVING", "INVERSE", "OBVERSE", "REVOLVE", "EVOLVES", "EVADING", "BLONDES", "DEVOLVE", "SIEVING", "IGNOBLE", "BOVINES", "BLONDER", "OVERDID"]
+},
+{
+"id":260726,
+"grid": [["N", "O", "P", "C"],["O", "M", "R", "H"],["I", "D", "A", "S"],["C", "N", "E", "T"]],
+"targetWords": ["NOMADIC", "STARDOM", "INDOORS", "ARSENIC", "HARDEST", "HARPOON", "SHAMPOO", "DOORMAN", "SARDINE", "PHRASED", "TEAROOM", "TANDOOR", "DOORMAT", "CRAMPON", "CHASTEN", "POMADES", "CINEAST", "ENAMORS"]
+},
+{
+"id":260727,
+"grid": [["R", "E", "E", "W"],["P", "E", "A", "T"],["O", "R", "R", "S"],["F", "O", "V", "E"]],
+"targetWords": ["OPERATE", "OVERSAW", "REPEATS", "POOREST", "TROOPER", "STEEPER", "FORESAW", "PERVERT", "SERRATE", "REPROOF", "PROVERS", "STEERER", "WEEPERS", "OVERAWE", "REPROVE", "OVEREAT", "PRORATE", "OVERATE"]
+},
+{
+"id":260728,
+"grid": [["A", "M", "E", "L"],["T", "P", "A", "R"],["E", "U", "S", "C"],["E", "L", "R", "E"]],
+"targetWords": ["AMATEUR", "CAPTURE", "MEASURE", "CAPSULE", "SLEEPER", "UPSCALE", "RAPTURE", "REPULSE", "ERASURE", "MATURES", "AMPUTEE", "ESCAPEE", "MERCERS", "CREMATE", "TAMPERS", "EPAULET", "ESCAPER", "CREASER"]
+},
+{
+"id":260729,
+"grid": [["T", "R", "E", "N"],["A", "S", "A", "O"],["O", "N", "L", "E"],["U", "C", "G", "R"]],
+"targetWords": ["NUCLEAR", "STRANGE", "ARSENAL", "UNCLEAR", "TREASON", "CLEANER", "UNCLEAN", "CLEANSE", "GLEANER", "NUCLEON", "GREASER", "CONGEAL", "TANGELO", "LEANEST", "COARSEN", "LOANERS", "LEANERS", "CLONERS"]
+},
+{
+"id":260730,
+"grid": [["R", "P", "S", "U"],["E", "I", "O", "S"],["V", "D", "E", "R"],["E", "N", "T", "U"]],
+"targetWords": ["EPISODE", "PREVENT", "VENTURE", "EVIDENT", "SPIDERS", "VENDORS", "DISSENT", "TEDIOUS", "DOSSIER", "SPORTED", "DEVIOUS", "ENVIOUS", "REDNESS", "EROSIVE", "DENTURE", "REPOSED", "PORTEND", "ENVIERS"]
+},
+{
+"id":260731,
+"grid": [["E", "M", "I", "L"],["A", "N", "O", "T"],["G", "T", "A", "P"],["E", "S", "O", "C"]],
+"targetWords": ["STATION", "STATING", "AMONGST", "LONGEST", "LINEAGE", "INMATES", "COATING", "POSTAGE", "MAGNATE", "MONTAGE", "CAPTION", "STAMINA", "ANIMATE", "EMANATE", "MINTAGE", "TOPCOAT", "LITOTES", "NOTATES"]
+},
+{
+"id":260801,
+"grid": [["E", "R", "L", "E"],["N", "A", "G", "M"],["T", "E", "D", "I"],["E", "A", "T", "S"]],
+"targetWords": ["GENERAL", "GRANTED", "TARGETS", "TEENAGE", "MIGRANT", "GRENADE", "MIGRATE", "ENRAGED", "REAGENT", "GRANTEE", "AGITATE", "MIDGETS", "GARNETS", "LEGATEE", "TEATIME", "READMIT", "GRADATE", "MISDEAL"]
+},
+{
+"id":260802,
+"grid": [["A", "O", "P", "T"],["D", "P", "R", "E"],["M", "I", "A", "E"],["S", "E", "N", "S"]],
+"targetWords": ["DISEASE", "SEMINAR", "EMPIRES", "TRAINEE", "SEAPORT", "MINARET", "APPEASE", "SNAPPER", "PROPANE", "ADMIRES", "SNIPPET", "ROADIES", "ADOPTER", "ADOPTEE", "TROPISM", "SEMIPRO", "APPRISE", "SNIPPER"]
+},
+{
+"id":260803,
+"grid": [["L", "H", "E", "D"],["C", "A", "R", "A"],["O", "I", "R", "P"],["S", "T", "O", "M"]],
+"targetWords": ["AIRPORT", "PARTIAL", "CHAIRED", "PORTICO", "CHARIOT", "PARROTS", "STIRRED", "CARROTS", "OSTRICH", "CHARRED", "APRICOT", "TRACHEA", "CHARADE", "CARPORT", "AIRHEAD", "ARMOIRE", "STOICAL", "HARICOT"]
+},
+{
+"id":260804,
+"grid": [["Y", "L", "N", "S"],["R", "T", "E", "O"],["O", "U", "C", "R"],["H", "S", "R", "E"]],
+"targetWords": ["CENTURY", "CURRENT", "SHORTLY", "SOURCES", "SHORTER", "LECTURE", "CRUELTY", "RECTORY", "CONTOUR", "SHORTEN", "SUCROSE", "CURSORY", "ERECTOR", "SHOUTER", "HURTLES", "ERECTLY", "SECURER", "SNORERS"]
+},
+{
+"id":260805,
+"grid": [["O", "T", "I", "C"],["P", "S", "A", "E"],["E", "L", "N", "R"],["D", "C", "T", "I"]],
+"targetWords": ["TRANSIT", "PLASTIC", "OPTICAL", "DEPOSIT", "DECLARE", "ELASTIC", "RECITAL", "SPECTRA", "INSPECT", "CANCELS", "CLASPED", "STARTLE", "ASEPTIC", "TRANCES", "NASTIER", "SALTINE", "PLECTRA", "DEPLANE"]
+},
+{
+"id":260806,
+"grid": [["W", "T", "I", "E"],["G", "C", "S", "D"],["N", "I", "E", "R"],["C", "O", "T", "N"]],
+"targetWords": ["CONCERT", "CONCERN", "DESCENT", "NOTICED", "NOTICES", "DENTIST", "RENTING", "CONCISE", "CONCEDE", "INCISED", "DISCERN", "CONCEIT", "DEICING", "EIDETIC", "DENTING", "DEICERS", "TONIEST", "COEDITS"]
+},
+{
+"id":260807,
+"grid": [["M", "I", "A", "T"],["N", "L", "U", "R"],["E", "C", "E", "D"],["S", "N", "O", "M"]],
+"targetWords": ["INCLUDE", "CERTAIN", "DECLINE", "SECURED", "SECULAR", "MODULES", "CURTAIN", "MODULAR", "RECLAIM", "TRAILED", "INCENSE", "NODULES", "CURTAIL", "ENCODER", "NODULAR", "RECLINE", "DECLAIM", "SECLUDE"]
+},
+{
+"id":260808,
+"grid": [["W", "H", "O", "U"],["E", "L", "T", "C"],["R", "E", "I", "E"],["B", "A", "S", "N"]],
+"targetWords": ["RELEASE", "WHEREAS", "NEITHER", "LICENSE", "OUTLINE", "WHEREIN", "THEREIN", "HOTLINE", "BAILOUT", "TENSILE", "HERETIC", "HELICES", "OUTLIER", "UTENSIL", "WHEELIE", "BEELINE", "COHERES", "WHERETO"]
+},
+{
+"id":260809,
+"grid": [["N", "Y", "E", "V"],["V", "O", "R", "G"],["E", "E", "L", "A"],["D", "S", "P", "L"]],
+"targetWords": ["SEVERAL", "OVERALL", "GALLERY", "OVERLAP", "NOVELLA", "DESERVE", "RELAPSE", "PAROLED", "ELAPSED", "GALLEON", "SEEPAGE", "OVERAGE", "PAROLES", "DEPLORE", "REGALED", "REGALES", "PAROLEE", "GROVELS"]
+},
+{
+"id":260810,
+"grid": [["T", "P", "U", "E"],["S", "R", "D", "N"],["I", "L", "E", "T"],["N", "G", "Y", "O"]],
+"targetWords": ["NURSING", "SINGLED", "PRUDENT", "SINGLET", "LINGERS", "PUNTERS", "SLINGER", "STRINGY", "INGENUE", "RINGLET", "TRUNDLE", "TENDRIL", "SPRINGY", "STRUDEL", "SPRINGE", "PURLING", "UPTREND", "PURSING"]
+},
+{
+"id":260811,
+"grid": [["C", "T", "D", "E"],["S", "I", "A", "T"],["P", "T", "R", "S"],["O", "U", "A", "I"]],
+"targetWords": ["STARTED", "OUTSIDE", "TOURIST", "STRAITS", "STARTUP", "UPSTATE", "TSARIST", "UPSTART", "DIARIST", "ASTRIDE", "PIRATED", "STRIATE", "TOPSIDE", "STATICS", "UTOPIAS", "SATIATE", "SPURTED", "TITRATE"]
+},
+{
+"id":260812,
+"grid": [["E", "S", "T", "Y"],["R", "E", "S", "L"],["P", "R", "I", "E"],["W", "G", "N", "R"]],
+"targetWords": ["PRIESTS", "STYLING", "REPRISE", "WRESTLE", "STERILE", "TERRIER", "REPRESS", "INGRESS", "PRESSER", "PRESETS", "GRISTLE", "STERNER", "PESTLES", "TERSELY", "RESTYLE", "TERRINE", "GRISTLY", "EERIEST"]
+},
+{
+"id":260813,
+"grid": [["E", "N", "P", "D"],["G", "I", "O", "E"],["L", "A", "R", "V"],["S", "T", "N", "A"]],
+"targetWords": ["AVERAGE", "VARIANT", "IGNORED", "PORTAGE", "STRIPED", "NIRVANA", "PORTALS", "OVARIAN", "VANTAGE", "STARING", "STARVED", "PERTAIN", "LATRINE", "OPERANT", "DERAILS", "REDOING", "RATLINE", "DEPORTS"]
+},
+{
+"id":260814,
+"grid": [["E", "T", "A", "L"],["I", "R", "C", "L"],["M", "O", "O", "E"],["E", "N", "S", "H"]],
+"targetWords": ["SECTION", "ACTIONS", "CONSOLE", "MIRACLE", "HORMONE", "EMIRATE", "RATIONS", "ONSHORE", "CLARION", "ORATION", "ORACLES", "CALORIE", "HELLCAT", "SHELLAC", "MONOCLE", "ELATION", "COLLATE", "LOCATER"]
+},
+{
+"id":260815,
+"grid": [["A", "I", "E", "N"],["N", "L", "C", "T"],["E", "G", "A", "N"],["R", "M", "E", "S"]],
+"targetWords": ["ANCIENT", "ELEMENT", "CLEMENT", "CINEMAS", "ELEGANT", "NEGLECT", "LINEMAN", "SEALING", "SALIENT", "TAGLINE", "REGALIA", "LENIENT", "GAMELAN", "LINEMEN", "LANCING", "GERMANE", "CLINGER", "ANTEING"]
+},
+{
+"id":260816,
+"grid": [["R", "E", "U", "C"],["E", "S", "R", "A"],["T", "C", "V", "E"],["A", "I", "D", "O"]],
+"targetWords": ["SERVICE", "RESERVE", "DEVICES", "CREDITS", "DIVERSE", "OVERSEE", "STEERED", "AUSTERE", "DEVIATE", "CAUSTIC", "OVERUSE", "DEAREST", "CREVICE", "CATERER", "RESTIVE", "EVACUEE", "EVICTEE", "STAIDER"]
+},
+{
+"id":260817,
+"grid": [["M", "R", "S", "T"],["I", "E", "U", "S"],["M", "N", "T", "A"],["A", "G", "I", "P"]],
+"targetWords": ["PAINTER", "INTERIM", "SUSTAIN", "IMAGINE", "TSUNAMI", "PASTURE", "PIGMENT", "MAGNETS", "TERMINI", "RUSTING", "TERMING", "PASTING", "TINIEST", "MINUTIA", "APTNESS", "MINTERS", "GAMINES", "PIASTER"]
+},
+{
+"id":260818,
+"grid": [["W", "I", "A", "W"],["L", "E", "S", "T"],["F", "O", "R", "H"],["N", "B", "V", "E"]],
+"targetWords": ["HERSELF", "WEATHER", "LEATHER", "OVERSAW", "FEATHER", "BREATHE", "THEREOF", "OBVERSE", "TAILORS", "FORESAW", "THEREON", "WAILERS", "AILERON", "BREATHS", "VERBOSE", "OVERSEA", "WASTREL", "OVEREAT"]
+},
+{
+"id":260819,
+"grid": [["R", "N", "T", "P"],["E", "T", "A", "E"],["H", "P", "R", "S"],["Y", "D", "O", "L"]],
+"targetWords": ["PARTNER", "PATTERN", "RETREAT", "PATROLS", "PANTHER", "SERPENT", "ENTROPY", "EARTHEN", "ROSETTE", "ATROPHY", "RENTERS", "HYDRATE", "HYDRANT", "ROSEATE", "PORTENT", "ENTREAT", "PATTERS", "REPAPER"]
+},
+{
+"id":260820,
+"grid": [["Y", "I", "V", "E"],["T", "S", "N", "D"],["D", "E", "S", "I"],["P", "A", "M", "W"]],
+"targetWords": ["INSTEAD", "DENSITY", "INVITED", "MASSIVE", "PASSIVE", "DEVISED", "INVITES", "SEASIDE", "WIDENED", "AMENITY", "DEVISES", "DENSEST", "PENSIVE", "MISSTEP", "MISSIVE", "DESTINE", "SITEMAP", "INSEAMS"]
+},
+{
+"id":260821,
+"grid": [["R", "E", "M", "R"],["C", "A", "N", "E"],["L", "O", "S", "R"],["T", "U", "U", "T"]],
+"targetWords": ["SURNAME", "MEASURE", "CLOSURE", "TURNOUT", "CONSULT", "CENSURE", "ERASURE", "RECLUSE", "CREAMER", "TONSURE", "OUTLAST", "MALTOSE", "MEANEST", "COURSER", "REAMERS", "CREASER", "LOANERS", "CLONERS"]
+},
+{
+"id":260822,
+"grid": [["R", "E", "O", "N"],["T", "O", "S", "I"],["D", "T", "U", "T"],["E", "S", "A", "C"]],
+"targetWords": ["STATION", "ESTATES", "AUCTION", "EROSION", "CAUTION", "TATTOOS", "SUCTION", "OUTCAST", "STUTTER", "SITUATE", "STATINS", "RESTATE", "CATSUIT", "INSTATE", "TESTATE", "ROOSTED", "ROUSTED", "CASUIST"]
+},
+{
+"id":260823,
+"grid": [["S", "M", "A", "G"],["I", "T", "E", "R"],["L", "C", "A", "R"],["H", "E", "T", "N"]],
+"targetWords": ["CLIMATE", "TARGETS", "TERRACE", "HECTARE", "ERRATIC", "CLEARER", "TACTILE", "CISTERN", "RATCHET", "NARRATE", "LECTERN", "EARACHE", "TREACLE", "CHEATER", "ITERATE", "TEATIME", "GARRETS", "TATAMIS"]
+},
+{
+"id":260824,
+"grid": [["A", "T", "G", "L"],["N", "D", "E", "A"],["A", "R", "T", "N"],["L", "S", "E", "V"]],
+"targetWords": ["GENERAL", "VETERAN", "ARSENAL", "LATERAL", "ETERNAL", "RELATES", "LANTERN", "VENTRAL", "ENTRANT", "ADRENAL", "SLANDER", "LANDERS", "VERANDA", "SLANTED", "VERDANT", "GLEANER", "LEANEST", "LEANERS"]
+},
+{
+"id":260825,
+"grid": [["S", "S", "E", "L"],["G", "E", "D", "M"],["R", "A", "N", "A"],["L", "T", "E", "B"]],
+"targetWords": ["MANAGED", "RENAMED", "MANAGES", "MANDATE", "MADNESS", "ENDLESS", "GRENADE", "DESSERT", "GRANDMA", "BANDAGE", "EMANATE", "GRANDEE", "RENAMES", "TREADLE", "ENTREES", "BADNESS", "LARGESS", "GRANDAM"]
+},
+{
+"id":260826,
+"grid": [["P", "S", "R", "V"],["A", "E", "A", "G"],["G", "L", "N", "T"],["D", "E", "L", "I"]],
+"targetWords": ["SELLING", "SERVANT", "SPELLED", "LINEAGE", "PAGEANT", "GENITAL", "VANILLA", "REAGENT", "GENTILE", "ALLEGES", "GELATIN", "GLEANED", "TILLAGE", "LEDGERS", "SEALANT", "GELLING", "TILLERS", "GALLING"]
+},
+{
+"id":260827,
+"grid": [["Y", "R", "S", "S"],["O", "P", "L", "E"],["A", "T", "E", "R"],["R", "C", "T", "E"]],
+"targetWords": ["ACTRESS", "PROTECT", "RESPECT", "ELECTOR", "RECTORY", "PARCELS", "SPECTRA", "PETRELS", "TOPLESS", "SPECTER", "RECTORS", "SPOTTER", "ERECTOR", "SPATTER", "TREETOP", "PEERESS", "ARTLESS", "PLECTRA"]
+},
+{
+"id":260828,
+"grid": [["R", "E", "T", "A"],["L", "I", "P", "S"],["A", "C", "O", "E"],["E", "H", "T", "S"]],
+"targetWords": ["OPTICAL", "HOSTILE", "SPATIAL", "ECLIPSE", "TOILETS", "TOPICAL", "HOSPICE", "SPOILER", "LACTOSE", "TAPIOCA", "CHALETS", "CALIPER", "ASEPTIC", "RIPOSTE", "EPOCHAL", "ASOCIAL", "STOICAL", "REPOSES"]
+},
+{
+"id":260829,
+"grid": [["D", "E", "T", "L"],["E", "I", "C", "A"],["S", "N", "I", "M"],["A", "R", "O", "C"]],
+"targetWords": ["CONICAL", "CORNICE", "DECIMAL", "ARSENIC", "CONCISE", "COMICAL", "CONCEDE", "ANIMATE", "INCISED", "INCITED", "MATINEE", "LAMINAR", "ROMAINE", "ANISEED", "DETAINS", "DECLAIM", "ECLAIRS", "CLAMORS"]
+},
+{
+"id":260830,
+"grid": [["P", "E", "T", "S"],["M", "U", "N", "O"],["M", "O", "R", "E"],["R", "E", "C", "D"]],
+"targetWords": ["COMMUNE", "DRUMMER", "MOMENTS", "COMMENT", "COMPUTE", "COMMUTE", "RECOUNT", "TENURED", "CORONET", "MOURNED", "DECORUM", "REROUTE", "REMOUNT", "DENTURE", "CORNETS", "CRUMPET", "STEPMOM", "CROUTON"]
+},
+{
+"id":260831,
+"grid": [["F", "O", "L", "U"],["S", "E", "R", "P"],["N", "S", "M", "E"],["T", "M", "I", "D"]],
+"targetWords": ["EMPRESS", "PREMISE", "SIMPLER", "IMPRESS", "PRESIDE", "MESSIER", "PROFESS", "IMMERSE", "DEPRESS", "SIDEMEN", "DIMPLES", "FOREMEN", "MISRULE", "IMPLORE", "DEPLORE", "DIMMERS", "DIMMEST", "DEMISES"]
+},
+{
+"id":260901,
+"grid": [["R", "O", "P", "E"],["T", "R", "I", "S"],["E", "N", "A", "M"],["G", "Y", "C", "H"]],
+"targetWords": ["AIRPORT", "ENTRIES", "PORTRAY", "CHASING", "CHARIOT", "PRIMACY", "POTENCY", "SPINACH", "CHANGER", "CARPORT", "HARPIES", "SPRINGY", "TROPISM", "SPRINGE", "HAIRNET", "SMARTEN", "CHANTEY", "TRAIPSE"]
+},
+{
+"id":260902,
+"grid": [["S", "H", "T", "S"],["T", "I", "W", "S"],["N", "L", "E", "M"],["G", "D", "T", "V"]],
+"targetWords": ["SINGLES", "TESTING", "WHISTLE", "THISTLE", "SINGLED", "SHINGLE", "SETLIST", "WINLESS", "WILDEST", "SWINDLE", "HITLESS", "SINGLET", "VESTING", "WITLESS", "SINLESS", "TINGLES", "MEWLING", "TINGLED"]
+},
+{
+"id":260903,
+"grid": [["E", "P", "B", "E"],["P", "R", "A", "D"],["T", "T", "I", "E"],["N", "A", "S", "T"]],
+"targetWords": ["PARTIES", "PRAISED", "DISTANT", "PEPTIDE", "ARTISAN", "RADIANT", "DATASET", "ARTISTE", "PREPAID", "ASTRIDE", "BATISTE", "SIDEBAR", "BRAISED", "BARISTA", "TIRADES", "PARTIED", "APPRISE", "ARTIEST"]
+},
+{
+"id":260904,
+"grid": [["A", "M", "I", "R"],["N", "G", "E", "L"],["O", "R", "A", "T"],["F", "L", "I", "S"]],
+"targetWords": ["FOREIGN", "FRAGILE", "MIGRATE", "FOREMAN", "FOLIAGE", "REALIST", "FLORETS", "FORGETS", "FLORIST", "REALIGN", "FORAGER", "GRISTLE", "FOLIATE", "FROGMAN", "FLAGMAN", "ANGORAS", "MANGIER", "STAGIER"]
+},
+{
+"id":260905,
+"grid": [["M", "I", "C", "E"],["R", "L", "N", "R"],["A", "I", "E", "P"],["M", "C", "S", "S"]],
+"targetWords": ["SPECIAL", "SCIENCE", "AIRLINE", "MARINES", "MINIMAL", "SILENCE", "RECLAIM", "SINCERE", "MARINER", "CARMINE", "AIRLESS", "RECLINE", "SCARIER", "ARMLESS", "SCALENE", "ENLACES", "MINICAM", "SCALIER"]
+},
+{
+"id":260906,
+"grid": [["D", "E", "N", "E"],["S", "I", "T", "G"],["A", "C", "N", "A"],["L", "A", "T", "U"]],
+"targetWords": ["ANCIENT", "GENETIC", "TANGENT", "DICTATE", "CANINES", "NEGATED", "LACTATE", "ALANINE", "LANCING", "CANTING", "NEGATES", "ACTUATE", "DESCANT", "SAINTED", "DENTING", "ANTACID", "AUNTIES", "NUTCASE"]
+},
+{
+"id":260907,
+"grid": [["E", "G", "A", "T"],["L", "N", "G", "U"],["O", "I", "N", "T"],["C", "E", "S", "E"]],
+"targetWords": ["ENGINES", "LICENSE", "TENSION", "COINAGE", "SIGNAGE", "TAGLINE", "TENSILE", "ANGLING", "LENIENT", "ANGELIC", "GUANINE", "UTENSIL", "TENSING", "SNUGGLE", "ANOINTS", "TANGELO", "GUNNIES", "TANNEST"]
+},
+{
+"id":260908,
+"grid": [["C", "L", "L", "U"],["A", "T", "E", "N"],["S", "R", "I", "V"],["E", "K", "N", "O"]],
+"targetWords": ["OVERALL", "REUNION", "INVERSE", "NOVELLA", "CLARION", "CALLERS", "KESTREL", "KERATIN", "LATRINE", "RESTIVE", "ELATION", "INVERTS", "STRIVEN", "TINKERS", "STALLER", "STINKER", "SALTINE", "OVERACT"]
+},
+{
+"id":260909,
+"grid": [["G", "N", "O", "B"],["E", "I", "E", "R"],["H", "A", "E", "H"],["R", "T", "T", "S"]],
+"targetWords": ["THEATER", "BENEATH", "TRAINER", "HEATHER", "HEROINE", "RESTART", "BREATHE", "TRAINEE", "IGNORES", "THEREIN", "HEATHEN", "THEREON", "BREATHS", "RETRAIN", "NEATEST", "THEREAT", "SHEATHE", "REHEATS"]
+},
+{
+"id":260910,
+"grid": [["T", "E", "S", "U"],["T", "A", "R", "O"],["E", "V", "E", "B"],["O", "L", "I", "R"]],
+"targetWords": ["RELEASE", "LETTERS", "ELEVATE", "ATELIER", "ROSETTE", "OVERUSE", "BERATES", "VIBRATE", "SERVILE", "VERBOSE", "OVERSEA", "ROSEATE", "BEATERS", "RIVETER", "SURVEIL", "OVEREAT", "OVERATE", "BEREAVE"]
+},
+{
+"id":260911,
+"grid": [["T", "E", "E", "P"],["D", "C", "R", "S"],["I", "E", "N", "C"],["V", "E", "T", "I"]],
+"targetWords": ["PERCENT", "RECEIVE", "PREVENT", "DIVERSE", "EVIDENT", "DECREES", "INSPECT", "PRECEDE", "DECEIVE", "SECRETE", "CREVICE", "EIDETIC", "SPEEDER", "SNEERED", "DIETERS", "SEEDIER", "EVICTEE", "CRETINS"]
+},
+{
+"id":260912,
+"grid": [["G", "C", "I", "L"],["I", "N", "E", "A"],["R", "T", "S", "G"],["E", "C", "O", "N"]],
+"targetWords": ["EASTERN", "CONSENT", "LASTING", "NOTICES", "COSTING", "ELASTIC", "SEALING", "SALIENT", "GASTRIC", "ASCETIC", "GNOSTIC", "STENCIL", "ELICITS", "INCITES", "CONGEAL", "CINEAST", "INCITER", "CONGEST"]
+},
+{
+"id":260913,
+"grid": [["O", "N", "E", "G"],["W", "I", "T", "D"],["T", "O", "S", "I"],["E", "R", "M", "E"]],
+"targetWords": ["EDITION", "EDITORS", "EROSION", "DEITIES", "EMOTION", "TWISTED", "MIDTOWN", "TORSION", "TERMITE", "DISTORT", "WORSTED", "ONETIME", "MIDGETS", "MORTISE", "MOISTEN", "SMIDGEN", "NOISOME", "ROSINED"]
+},
+{
+"id":260914,
+"grid": [["P", "E", "C", "T"],["O", "R", "A", "E"],["S", "T", "R", "L"],["O", "U", "T", "Y"]],
+"targetWords": ["OPERATE", "TERRACE", "POSTURE", "SURREAL", "SORCERY", "STATELY", "CARROTS", "TRACERY", "STARLET", "TRACERS", "RATTLER", "STARTLE", "STOUTLY", "TATTLER", "PRATTLE", "OUTRACE", "PERCALE", "TREATER"]
+},
+{
+"id":260915,
+"grid": [["L", "M", "A", "R"],["E", "A", "C", "T"],["R", "H", "I", "L"],["O", "T", "E", "N"]],
+"targetWords": ["ARTICLE", "MACHINE", "NEITHER", "MARTIAL", "ETHICAL", "REMATCH", "CHORALE", "EARTHEN", "HELICAL", "RAILCAR", "EROTICA", "RATCHET", "TRACHEA", "MARCHER", "TRAMCAR", "TREACLE", "MATCHER", "RATLINE"]
+},
+{
+"id":260916,
+"grid": [["I", "E", "E", "D"],["T", "M", "N", "L"],["S", "A", "G", "A"],["P", "E", "T", "R"]],
+"targetWords": ["LARGEST", "MANAGES", "TEENAGE", "MAGNATE", "MAGNETS", "TANGLED", "ENLARGE", "PASTIME", "GAMELAN", "MANGLED", "EMANATE", "GRANDEE", "MELANGE", "TANDEMS", "TEATIME", "SPANGLE", "STANDEE", "PETALED"]
+},
+{
+"id":260917,
+"grid": [["S", "S", "M", "N"],["U", "N", "E", "A"],["R", "D", "S", "L"],["E", "I", "A", "B"]],
+"targetWords": ["SLENDER", "ENSURED", "BASEMAN", "SUNRISE", "SEASIDE", "SADNESS", "AMNESIA", "SIDEMAN", "DISABLE", "SUNDIAL", "BLENDER", "MALAISE", "REDNESS", "BADNESS", "RIDABLE", "BALSAMS", "UNSEALS", "REDIALS"]
+},
+{
+"id":260918,
+"grid": [["P", "R", "I", "D"],["N", "P", "O", "N"],["S", "R", "E", "T"],["E", "T", "T", "C"]],
+"targetWords": ["PROTECT", "RESPECT", "RESPOND", "PRINTER", "SERPENT", "POINTER", "ENDORSE", "PRETEND", "STEROID", "RIOTERS", "REPRINT", "POTTERS", "INTERNS", "SPOTTER", "ERECTOR", "PORTENT", "DINETTE", "PORTEND"]
+},
+{
+"id":260919,
+"grid": [["N", "S", "E", "R"],["A", "T", "A", "C"],["Y", "L", "I", "O"],["L", "P", "S", "H"]],
+"targetWords": ["TYPICAL", "COASTAL", "PLASTIC", "PLASTER", "RECITAL", "HOSPICE", "PLANTER", "STYLISH", "CALYPSO", "COSPLAY", "PLANTAR", "SEALANT", "RETAILS", "SPLICES", "RECOILS", "NASALLY", "SPLICER", "NASTILY"]
+},
+{
+"id":260920,
+"grid": [["P", "O", "L", "M"],["L", "U", "N", "I"],["L", "E", "T", "T"],["S", "A", "R", "E"]],
+"targetWords": ["MINUTES", "MINERAL", "TITULAR", "LITERAL", "REUNITE", "NITRATE", "RETINUE", "LINTELS", "OPULENT", "SELLOUT", "LUNETTE", "RETELLS", "POLLUTE", "ITERATE", "POLENTA", "PULSATE", "POLITER", "PLEATER"]
+},
+{
+"id":260921,
+"grid": [["D", "L", "P", "C"],["E", "L", "A", "O"],["E", "T", "O", "M"],["H", "S", "U", "P"]],
+"targetWords": ["COMPOSE", "STALLED", "COMPUTE", "SHELLED", "COOLEST", "COMPOST", "POMPOUS", "AMPUTEE", "CALLOUS", "PALLETS", "SHELLAC", "MALLETS", "MALTOSE", "STAPLED", "OUTSELL", "COMPOTE", "CAPLETS", "DELOUSE"]
+},
+{
+"id":260922,
+"grid": [["R", "E", "S", "S"],["P", "E", "C", "I"],["M", "I", "R", "G"],["L", "A", "N", "A"]],
+"targetWords": ["EMPRESS", "PRECISE", "SEMINAL", "SEMINAR", "IMPRESS", "CRANIAL", "SEEMING", "LAMINAR", "REPRESS", "INGRESS", "GREMLIN", "PEERING", "PIERCES", "SEEPING", "AMPERES", "ANGRIER", "PIERCER", "CRIMPER"]
+},
+{
+"id":260923,
+"grid": [["I", "T", "R", "Y"],["N", "U", "O", "P"],["P", "E", "S", "R"],["D", "S", "E", "T"]],
+"targetWords": ["PRESENT", "PURPOSE", "DESTROY", "ROUTINE", "TRUSTEE", "PRESSED", "ENTROPY", "DESSERT", "TROUPES", "REENTRY", "TROUSER", "NITROUS", "ENTRUST", "PURPORT", "POUTINE", "TRUSSED", "PRESORT", "TOUPEES"]
+},
+{
+"id":260924,
+"grid": [["C", "U", "P", "W"],["S", "E", "R", "T"],["L", "T", "I", "A"],["E", "G", "N", "W"]],
+"targetWords": ["CERTAIN", "STRANGE", "RESTING", "CURTAIN", "WRESTLE", "PURITAN", "TANGIER", "TRESTLE", "PERTAIN", "RUSTING", "TANGLES", "RINGLET", "PELTING", "WRANGLE", "TINWARE", "WRITEUP", "TINGLES", "WANGLES"]
+},
+{
+"id":260925,
+"grid": [["V", "A", "G", "T"],["P", "A", "R", "N"],["D", "P", "I", "A"],["T", "E", "S", "H"]],
+"targetWords": ["PRAISED", "VARIANT", "TRAPPED", "PARADES", "DESPAIR", "PARAPET", "RAPPING", "VAGRANT", "SPARING", "VARNISH", "GRASPED", "GARNISH", "SHARPIE", "HARPIES", "SANGRIA", "PARIAHS", "APPRISE", "TRAIPSE"]
+},
+{
+"id":260926,
+"grid": [["L", "S", "P", "W"],["E", "T", "I", "H"],["D", "N", "T", "P"],["L", "Y", "E", "S"]],
+"targetWords": ["DESPITE", "SETTLED", "DESTINY", "WHISTLE", "THISTLE", "DENTIST", "EPISTLE", "STIPEND", "WHITTLE", "ENTITLE", "PETITES", "SPINDLY", "PIPETTE", "SPITTLE", "DESTINE", "SPINETS", "STINTED", "NETTLED"]
+},
+{
+"id":260927,
+"grid": [["D", "G", "R", "O"],["E", "I", "A", "T"],["M", "L", "E", "S"],["W", "A", "Y", "H"]],
+"targetWords": ["RAILWAY", "STORAGE", "MIGRATE", "STEAMED", "EMIRATE", "MAESTRO", "MEDIATE", "TRAILED", "MILEAGE", "STORIED", "ASTRIDE", "LEGATES", "WAYLAID", "DILATOR", "DILATES", "GIMLETS", "EDGIEST", "IRATELY"]
+},
+{
+"id":260928,
+"grid": [["U", "P", "D", "G"],["L", "E", "S", "E"],["A", "C", "T", "T"],["I", "D", "A", "R"]],
+"targetWords": ["STARTED", "SPECIAL", "RADICAL", "DIALECT", "ACETATE", "SPECTRA", "UPSTATE", "UPSCALE", "PLEDGES", "DICTATE", "UPSTART", "LACTATE", "PLACATE", "DETRACT", "SCALPED", "PLECTRA", "GESTATE", "SCATTED"]
+},
+{
+"id":260929,
+"grid": [["R", "E", "T", "G"],["Y", "I", "N", "A"],["R", "N", "C", "U"],["A", "E", "L", "N"]],
+"targetWords": ["ANCIENT", "NUCLEAR", "EARNING", "UNCLEAR", "LEANING", "NEARING", "UNCANNY", "LUNATIC", "NUNNERY", "LENIENT", "TANNERY", "CANNERY", "UNCLEAN", "CANTINA", "RECITER", "UNLEARN", "CANNIER", "GAUNTER"]
+},
+{
+"id":260930,
+"grid": [["L", "C", "M", "A"],["T", "A", "I", "D"],["B", "R", "N", "E"],["M", "I", "S", "T"]],
+"targetWords": ["CABINET", "TRAINED", "ADMIRAL", "MARINES", "MINIMAL", "ARSENIC", "TRIDENT", "CARBINE", "CARMINE", "TAINTED", "MAIDENS", "DIARIST", "LATRINE", "MINICAB", "CARNIES", "MINIBAR", "BRAINED", "RACIEST"]
+}
+
+];
+
+    let maze = {};
+    let selectedPath = []; 
+    let foundWords = [];
+    let hintedWords = new Set();
+    let totalScore = 0;
+    let hasCelebratedSupremo = false;
+
+    const gridEl = document.getElementById('grid');
+    const pathLine = document.getElementById('path-line');
+    const statusMsg = document.getElementById('status-msg');
+    const winOverlay = document.getElementById('win-overlay');
+    const supremoOverlay = document.getElementById('supremo-overlay');
+    const scoreDisplay = document.getElementById('total-score-display');
+
+    function getTodayId() {
+        const today = new Date();
+        const yy = String(today.getFullYear()).slice(-2);
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        return parseInt(yy + mm + dd);
+    }
+
+    function startDailyGame() {
+        document.getElementById('intro-container').style.display = 'none';
+        document.getElementById('game-container').style.display = 'block';
+        setupNewGame();
+    }
+
+    function setupNewGame() {
+        const todayId = getTodayId();
+        const dailyPuzzle = gameData.find(g => g.id === todayId);
+        
+        if (dailyPuzzle) {
+            initializeGame(dailyPuzzle);
+            statusMsg.innerText = "Today's puzzle";
+        } else {
+            const randomIndex = Math.floor(Math.random() * gameData.length);
+            initializeGame(gameData[randomIndex]);
+            statusMsg.innerText = "Daily puzzle not found. Loaded a random puzzle!";
+        }
+    }
+    
+    function getTodayYYMMDD() {
+        const today = new Date();
+        const yy = String(today.getFullYear()).slice(-2);
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        return parseInt(yy + mm + dd, 10);
+    }
+
+    function loadArchivedGame() {
+        const todayInt = getTodayYYMMDD();
+        const archivedPuzzles = gameData.filter(puzzle => puzzle.id < todayInt);
+        
+        if (archivedPuzzles.length === 0) {
+            alert("No archived puzzles available yet!");
+            return;
+        }
+        
+        const randomIndex = Math.floor(Math.random() * archivedPuzzles.length);
+        const chosenPuzzle = archivedPuzzles[randomIndex];
+        
+        initializeGame(chosenPuzzle); 
+        statusMsg.innerText = `Archived puzzle #${chosenPuzzle.id} loaded!`;
+    }
+
+    function initializeGame(data) {
+        localStorage.removeItem('sevens_game_state');
+
+        maze = data;
+        foundWords = [];
+        hintedWords = new Set();
+        totalScore = 0;
+        selectedPath = [];
+        hasCelebratedSupremo = false;
+
+        statusMsg.innerText = `Game #${maze.id} loaded!`;
+        winOverlay.style.display = 'none';
+        supremoOverlay.style.display = 'none';
+        updateScoreDisplay();
+        renderGrid();
+        renderWordList();
+        updateUI();
+    }
+
+    function renderGrid() {
+        const cells = gridEl.querySelectorAll('.cell');
+        cells.forEach(c => c.remove());
+        for (let r = 0; r < 4; r++) {
+            for (let c = 0; c < 4; c++) {
+                const cell = document.createElement('div');
+                cell.className = 'cell';
+                cell.innerText = maze.grid[r][c];
+                cell.dataset.r = r;
+                cell.dataset.c = c;
+                cell.onmousedown = (e) => { e.preventDefault(); startSelection(r, c); };
+                cell.onmouseenter = () => continueSelection(r, c);
+                gridEl.appendChild(cell);
+            }
+        }
+    }
+
+    // Input Handling
+    gridEl.addEventListener('touchstart', (e) => {
+        const touch = e.touches[0];
+        const el = document.elementFromPoint(touch.clientX, touch.clientY);
+        if (el && el.classList.contains('cell')) {
+            e.preventDefault();
+            startSelection(parseInt(el.dataset.r), parseInt(el.dataset.c));
+        }
+    }, { passive: false });
+
+    gridEl.addEventListener('touchmove', (e) => {
+        e.preventDefault();
+        const touch = e.touches[0];
+        const el = document.elementFromPoint(touch.clientX, touch.clientY);
+        if (el && el.classList.contains('cell')) {
+            continueSelection(parseInt(el.dataset.r), parseInt(el.dataset.c));
+        }
+    }, { passive: false });
+
+    window.addEventListener('mouseup', endSelection);
+    window.addEventListener('touchend', endSelection);
+
+    function startSelection(r, c) {
+        statusMsg.innerText = "";
+        selectedPath = [{r, c}];
+        updateUI();
+    }
+
+    function continueSelection(r, c) {
+        if (selectedPath.length === 0) return;
+        const last = selectedPath[selectedPath.length - 1];
+        if (last.r === r && last.c === c) return;
+        const secondLast = selectedPath.length > 1 ? selectedPath[selectedPath.length - 2] : null;
+        if (secondLast && secondLast.r === r && secondLast.c === c) {
+            selectedPath.pop();
+            updateUI();
+            return;
+        }
+        const alreadySelected = selectedPath.find(p => p.r === r && p.c === c);
+        const isAdjacent = Math.abs(last.r - r) <= 1 && Math.abs(last.c - c) <= 1;
+        if (isAdjacent && !alreadySelected) {
+            selectedPath.push({r, c});
+            updateUI();
+        }
+    }
+
+    function endSelection() {
+        if (selectedPath.length === 0) return;
+        const word = selectedPath.map(p => maze.grid[p.r][p.c]).join('');
+        if (word.length === 7) {
+            if (foundWords.some(fw => fw.word === word)) {
+                statusMsg.innerText = `${word} was already found`;
+            } else if (maze.targetWords.includes(word)) {
+                const pts = hintedWords.has(word) ? 7 : 10;
+                foundWords.push({word, score: pts});
+                totalScore += pts;
+                statusMsg.innerText = `+${pts} Points!`;
+                renderWordList();
+                updateScoreDisplay();
+                checkWin();
+            } else {
+                statusMsg.innerText = `${word} isn't in our word list`;
+            }
+        }
+        selectedPath = [];
+        updateUI();
+        saveGameState(); 
+    }
+
+    function updateUI() {
+        const cells = document.querySelectorAll('.cell');
+        let pointsArr = [];
+        cells.forEach(cell => {
+            const r = parseInt(cell.dataset.r);
+            const c = parseInt(cell.dataset.c);
+            const pathIndex = selectedPath.findIndex(p => p.r === r && p.c === c);
+            cell.classList.toggle('selected', pathIndex !== -1);
+            if (pathIndex !== -1) {
+                const x = cell.offsetLeft + cell.offsetWidth / 2;
+                const y = cell.offsetTop + cell.offsetHeight / 2;
+                pointsArr[pathIndex] = `${x},${y}`;
+            }
+        });
+        pathLine.setAttribute('points', pointsArr.join(' '));
+        const currentStr = selectedPath.map(p => maze.grid[p.r][p.c]).join('');
+        document.querySelector('#current-word span').innerText = currentStr;
+    }
+
+    function getSnakeRank(score) {
+        if (score === 0) return "Hapless";
+        if (score >= 1 && score <= 19) return "Nascent";
+        if (score >= 20 && score <= 39) return "Capable";
+        if (score >= 40 && score <= 59) return "Protean";
+        if (score >= 60 && score <= 79) return "Premium";
+        if (score >= 80 && score <= 99) return "Stellar";
+        if (score >= 100 && score <= 119) return "Sublime";
+        if (score >= 120 && score <= 179) return "Supremo";
+        if (score >= 180) return "Perfect";
+        return "";
+    }
+
+    function updateScoreDisplay() {
+        const rank = getSnakeRank(totalScore);
+        scoreDisplay.innerHTML = `Score: ${totalScore} &nbsp;&nbsp;&nbsp;&nbsp; Rank: ${rank}`;
+    }
+
+    function renderWordList() {
+        const list = document.getElementById('list-items');
+        list.innerHTML = foundWords.map(fw => 
+            `<div class="found-word">
+                <span>${fw.word}</span>
+                <span class="score-val">${fw.score} pts</span>
+            </div>`
+        ).join('');
+        document.querySelector('#word-list strong').innerText = `Words Found (${foundWords.length}):`;
+    }
+
+    function provideHint() {
+        const remaining = maze.targetWords.filter(w => !foundWords.some(fw => fw.word === w));
+        if (remaining.length > 0) {
+            hintedWords.add(remaining[0]);
+            statusMsg.innerText = "Hint (7 pts): Starts with " + remaining[0].substring(0, 2);
+            saveGameState(); 
+        }
+    }
+
+    function revealWord() {
+        const remaining = maze.targetWords.filter(w => !foundWords.some(fw => fw.word === w));
+        if (remaining.length > 0) {
+            const wordToReveal = remaining[0];
+            foundWords.push({word: wordToReveal, score: 0});
+            statusMsg.innerText = `Revealed: ${wordToReveal} (0 pts)`;
+            renderWordList();
+            checkWin();
+            saveGameState(); 
+        }
+    }
+
+    function checkWin() {
+        // Milestone Check: Supremo Celebration
+        if (totalScore >= 120 && !hasCelebratedSupremo) {
+            hasCelebratedSupremo = true;
+            supremoOverlay.style.display = 'flex';
+            saveGameState();
+        }
+
+        // Complete Game Check
+        if (foundWords.length === 18) {
+            const wordString = foundWords.map(fw => fw.word).join(', ');
+            document.getElementById('found-summary').innerText = wordString;
+            document.getElementById('final-score').innerText = `Final Score: ${totalScore}`;
+            winOverlay.style.display = 'flex';
+            
+            localStorage.removeItem('sevens_game_state');
+        }
+    }
+
+    function closeSupremoOverlay() {
+        supremoOverlay.style.display = 'none';
+    }
+
+    function closeWinAndRestart() {
+        winOverlay.style.display = 'none';
+        setupNewGame();
+    }
+    
+    function saveGameState() {
+        if (!maze || !maze.id) return;
+        
+        const state = {
+            maze: maze,
+            foundWords: foundWords,
+            hintedWords: Array.from(hintedWords), 
+            totalScore: totalScore,
+            hasCelebratedSupremo: hasCelebratedSupremo
+        };
+        localStorage.setItem('sevens_game_state', JSON.stringify(state));
+    }
+
+    function loadGameState() {
+        const savedData = localStorage.getItem('sevens_game_state');
+        if (!savedData) return false;
+
+        try {
+            const state = JSON.parse(savedData);
+            
+            maze = state.maze;
+            foundWords = state.foundWords;
+            hintedWords = new Set(state.hintedWords); 
+            totalScore = state.totalScore;
+            hasCelebratedSupremo = state.hasCelebratedSupremo || false;
+
+            statusMsg.innerText = `Welcome back! Game #${maze.id} restored.`;
+            winOverlay.style.display = 'none';
+            supremoOverlay.style.display = 'none';
+            updateScoreDisplay();
+            renderGrid();
+            renderWordList();
+            updateUI();
+
+            return true;
+        } catch (e) {
+            console.error("Error parsing saved game state:", e);
+            return false;
+        }
+    }
+
+    window.onload = function() {
+        const savedData = localStorage.getItem('sevens_game_state');
+        
+        if (savedData) {
+            try {
+                const state = JSON.parse(savedData);
+                const todayId = getTodayId();
+
+                if (state.maze && state.maze.id === todayId) {
+                    const gameRestored = loadGameState();
+                    if (gameRestored) {
+                        document.getElementById('intro-container').style.display = 'none';
+                        document.getElementById('game-container').style.display = 'block';
+                        return; 
+                    }
+                } else {
+                    localStorage.removeItem('sevens_game_state');
+                }
+            } catch (e) {
+                console.error("Error evaluating saved game date consistency:", e);
+            }
+        }
+    };
+</script>
+</body>
+</html>
