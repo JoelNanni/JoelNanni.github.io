@@ -1,0 +1,2473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="windows-1252"> <title>The Whole Nine - Interactive Solver</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        body {
+            margin: 0;
+            padding: 12px;
+            background-color: #2b2b2b;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 100vh;
+            font-family: Arial, sans-serif;
+            color: #ffffff;
+            box-sizing: border-box;
+        }
+        #top-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 12px;
+            background: #444;
+            padding: 8px 12px;
+            border-radius: 5px;
+            width: 100%;
+            max-width: 680px;
+            box-sizing: border-box;
+        }
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        select, button {
+            padding: 6px 12px;
+            font-size: 14px;
+            font-weight: bold;
+            background: #fff;
+            color: #333;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        button {
+            background-color: #e74c3c;
+            color: white;
+            transition: background 0.2s;
+        }
+        button:hover {
+            background-color: #c0392b;
+        }
+        button.active {
+            background-color: #27ae60;
+        }
+        button.aux-btn {
+            background-color: #3498db;
+        }
+        button.aux-btn:hover {
+            background-color: #2980b9;
+        }
+        button.aux-btn.active {
+            background-color: #9b59b6;
+        }
+        #trios-bar {
+            width: 100%;
+            max-width: 680px;
+            background-color: #222;
+            border: 2px solid #555;
+            border-radius: 5px;
+            padding: 12px;
+            margin-bottom: 12px;
+            box-sizing: border-box;
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            row-gap: 10px;
+            column-gap: 6px;
+            justify-items: center;
+        }
+        .trio-item {
+            font-family: "Courier New", Courier, monospace;
+            font-size: 16px;
+            font-weight: bold;
+            color: #ddd;
+            cursor: pointer;
+            padding: 2px 6px;
+            position: relative;
+            user-select: none;
+            transition: color 0.1s;
+        }
+        .trio-item:hover {
+            color: #fff;
+            background-color: #444;
+            border-radius: 3px;
+        }
+        .trio-item.marked {
+            color: #e74c3c;
+        }
+        .trio-item.marked::after {
+            content: "";
+            position: absolute;
+            left: 0;
+            top: 50%;
+            width: 100%;
+            height: 3px;
+            background-color: #e74c3c;
+            transform-origin: center;
+        }
+        canvas {
+            background-color: #ffffff;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            border-radius: 4px;
+            cursor: pointer;
+            width: 100%;
+            max-width: 680px;
+            height: auto;
+            margin-bottom: 12px;
+        }
+        #clue-box {
+            width: 100%;
+            max-width: 680px;
+            background-color: #3a3a3a;
+            border-radius: 5px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.4);
+            padding: 14px 15px;
+            box-sizing: border-box;
+            min-height: 72px;
+            border-left: 5px solid #e74c3c;
+        }
+        .context-clue {
+            font-size: 15px;
+            line-height: 1.4;
+            margin: 4px 0;
+        }
+        .context-clue .nonet-label {
+            font-weight: bold;
+            color: #e74c3c;
+            margin-right: 6px;
+        }
+
+        /* OVERLAY / MODAL STYLES */
+        .overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .overlay-content {
+            background: #333;
+            padding: 25px;
+            border-radius: 8px;
+            max-width: 500px;
+            width: 100%;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.6);
+            border: 2px solid #555;
+            text-align: center;
+        }
+        .overlay-content h2 {
+            margin-top: 0;
+            color: #e74c3c;
+        }
+        .overlay-content p {
+            line-height: 1.6;
+            font-size: 15px;
+            color: #eee;
+            text-align: left;
+        }
+        #celebration-overlay .overlay-content {
+            border-color: #27ae60;
+        }
+        #celebration-overlay h2 {
+            color: #27ae60;
+            font-size: 28px;
+            margin-bottom: 10px;
+        }
+        #celebration-overlay p {
+            text-align: center;
+            font-size: 16px;
+        }
+        .dismiss-prompt {
+            margin-top: 20px;
+            font-size: 12px;
+            color: #888 !important;
+            text-align: center !important;
+        }
+
+        /* DYNAMIC VIRTUAL KEYBOARD STYLING */
+        #virtual-keyboard {
+            display: none;
+            width: 100%;
+            max-width: 680px;
+            margin-top: 14px;
+            background: #1e1e1e;
+            padding: 8px;
+            border-radius: 6px;
+            box-sizing: border-box;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+        }
+        .keyboard-row {
+            display: flex;
+            justify-content: center;
+            gap: 5px;
+            margin-bottom: 6px;
+        }
+        .keyboard-row:last-child {
+            margin-bottom: 0;
+        }
+        .key {
+            flex: 1;
+            height: 46px;
+            padding: 0;
+            font-size: 16px;
+            font-weight: bold;
+            background: #e0e0e0;
+            color: #222;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            touch-action: manipulation;
+            user-select: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.1s;
+        }
+        .key:active {
+            background: #b0b0b0;
+            color: #000;
+        }
+        .key.fn-key {
+            background: #777;
+            color: #fff;
+            flex: 1.5;
+            font-size: 13px;
+        }
+        .key.fn-key:active {
+            background: #555;
+        }
+
+        @media (max-width: 768px) {
+            #virtual-keyboard {
+                display: block;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div id="top-bar">
+    <div class="control-group">
+        <select id="puzzle-select"></select>
+        <button id="instructions-btn" class="aux-btn">Instructions</button>
+    </div>
+    <div class="control-group">
+        <button id="check-btn">Check Puzzle</button>
+        <button id="reveal-btn" class="aux-btn">Reveal Answers</button>
+        <button id="reset-btn">Reset Puzzle</button>
+    </div>
+</div>
+
+<div id="trios-bar"></div>
+
+<canvas id="puzzleCanvas" width="836" height="640"></canvas>
+
+<div id="clue-box">
+    <div id="clues-target">Click or touch a box on the grid above to view clues.</div>
+</div>
+
+<div id="instructions-overlay" class="overlay">
+    <div class="overlay-content">
+        <h2>The Whole Nine</h2>
+        <p>The answer for each clue below is a nine-letter word or phrase. The nine letters are to be placed in order around the corresponding number in the solving grid. The arrows show direction &mdash; clockwise or counter-clockwise &mdash; but it's up to you to determine the starting spot.</p>
+        <p>41 of the 55 letter triplets are part of two different entries, but the 14 along the outer edge are not. As an aid to solving, we've thus provided an alphabetical list of those triplets in correct answer-word order.</p>
+        <p class="dismiss-prompt">Click, touch, or press any key to dismiss.</p>
+    </div>
+</div>
+
+<div id="celebration-overlay" class="overlay">
+    <div class="overlay-content">
+        <h2>Congratulations!</h2>
+        <p>You solved the puzzle!</p>
+        <p class="dismiss-prompt">Click, touch, or press any key to dismiss.</p>
+    </div>
+</div>
+
+<div id="virtual-keyboard">
+    <div class="keyboard-row">
+        <button class="key">Q</button><button class="key">W</button><button class="key">E</button><button class="key">R</button><button class="key">T</button>
+        <button class="key">Y</button><button class="key">U</button><button class="key">I</button><button class="key">O</button><button class="key">P</button>
+    </div>
+    <div class="keyboard-row">
+        <button class="key">A</button><button class="key">S</button><button class="key">D</button><button class="key">F</button><button class="key">G</button>
+        <button class="key">H</button><button class="key">J</button><button class="key">K</button><button class="key">L</button>
+    </div>
+    <div class="keyboard-row">
+        <button class="key fn-key" id="key-del">DEL</button>
+        <button class="key">Z</button><button class="key">X</button><button class="key">C</button><button class="key">V</button>
+        <button class="key">B</button><button class="key">N</button><button class="key">M</button>
+        <button class="key fn-key" id="key-bksp">&#9003;</button>
+    </div>
+</div>
+
+<script>
+    const myPuzzleLibrary = [
+          {
+            id: 1,
+            data: `
+AZQUEZVEL|VELAZQUEZ
+NONMETALS|NONMETALS
+RICINGREP|REPRICING
+LEVILOFAO|OLIVELOAF
+SLANACZEU|SUEZCANAL
+PERATETEM|TEMPERATE
+VOREYEGNI|ROVINGEYE
+OLISTENST|LISTENSTO
+CANNEDHAM|CANNEDHAM
+ETATSEERT|STATETREE
+EYEDTEARY|TEARYEYED
+TSNUTSPOR|SPORTSNUT
+MAHSKAETS|HAMSTEAKS
+TREATEDEN|ENTREATED
+YRANNIEST|TYRANNIES
+LOGHTEETD|GOLDTEETH
+STUNUOYOT|NUTSTOYOU
+AKSREVOET|SKATEOVER
+ETACIDERP|PREDICATE
+INNEREPLA|PERENNIAL
+ETHOUGHTR|RETHOUGHT
+TEOUSBOUN|BOUNTEOUS
+PRETNEVER|PREVENTER
+ALPYTIDIC|PLACIDITY
+RTHUNDERE|THUNDERER
+BSUINEGYO|BOYGENIUS
+ENTDIVERG|DIVERGENT
+ITYBARBAR|BARBARITY
+DNUFTSURT|TRUSTFUND
+GREBUAENI|AUBERGINE
+RABEDAVID|DAVIDRABE
+TRUGOYRAB|YOGURTBAR
+1. 17th-century painter of "Lady With a Fan"<VELAZQUEZ>|FRI
+2. Elements unlike aluminum and tin<NONMETALS>|JDN
+3. Marking down, maybe<REPRICING>|NON
+4. Possible sub component<OLIVELOAF>|010
+5. Mediterranean-Red Sea connector<SUEZCANAL>|010
+6. Sober and restrained<TEMPERATE>|FRI
+7. Philanderer's outlook<ROVINGEYE>|NON
+8. Hears out<LISTENSTO>|JDN
+9. Hormel product with a long shelf life<CANNEDHAM>|JDN
+10. Magnolia or pecan<STATETREE>|FRI
+11. A bit choked up, perhaps<TEARYEYED>|NON
+12. Season ticket holder for baseball, basketball and football, say<SPORTSNUT>|NY1
+13. Components of some hearty breakfasts<HAMSTEAKS>|NON
+14. Implored<ENTREATED>|JDN
+15. Unpleasant rules to be under<TYRANNIES>|FRI
+16. Grill relative<GOLDTEETH>|JDN
+17. "Take a hike!"<NUTSTOYOU>|JDN
+18. Barely mention, as something one doesn't want to discuss<SKATEOVER>|FRI
+19. Verb clause<PREDICATE>|NON
+20. Lily, for one<PERENNIAL>|WED
+21. Worked out again<RETHOUGHT>|JDN
+22. Plentiful, archaically<BOUNTEOUS>|JDN
+23. What Smokey wants you to be, re forest fires<PREVENTER>|JDN
+24. Tameness<PLACIDITY>|NON
+25. Stentorian speaker<THUNDERER>|NON
+26. Prodigy, sometimes<BOYGENIUS>|JDN
+27. Growing apart<DIVERGENT>|JDN
+28. Brutality<BARBARITY>|NON
+29. Heir's financial security<TRUSTFUND>|JDN
+30. Alternative name for an eggplant<AUBERGINE>|NON
+31. "Streamers" playwright<DAVIDRABE>|NON
+32. Ice pop alternative<YOGURTBAR>|NON
+AUB  AZQ  EDA  GOL  NON  OAF  OUG  OYG  POR  RIC  ROV  STF  TOY  YOG
+`},
+          {
+            id: 2,
+            data: `
+BFAELDAOR|BROADLEAF
+KLEENEXES|KLEENEXES
+OYALISTSR|ROYALISTS
+ROATHTAKE|OATHTAKER
+SEXMIDDLE|MIDDLESEX
+RSTIFFENE|STIFFENER
+LINESSSIL|SILLINESS
+THTRAEENO|EARTHTONE
+DIMASPIHS|AMIDSHIPS
+FFILCDARE|RADCLIFFE
+SSESMOBBO|MOBBOSSES
+ONEYARTRO|ARTROONEY
+SHIFTGEAR|GEARSHIFT
+ERAYALPSA|PLAYAREAS
+OBBEREDCL|CLOBBERED
+GNIHTOOMS|SMOOTHING
+RAYBOBAND|BOBANDRAY
+GTFOSSDOO|SOFTGOODS
+LAYREADER|LAYREADER
+EREWOPMED|EMPOWERED
+OTHEMOONT|TOTHEMOON
+OODACMBOB|BOBMCADOO
+REDSCISSO|SCISSORED
+DEMITMAER|DREAMTIME
+TNOSREPOW|TWOPERSON
+MCAREERIS|CAREERISM
+ICSSEMANT|SEMANTICS
+MTIELFITO|LEITMOTIF
+ERSISLAND|ISLANDERS
+TNACEPEER|PECANTREE
+OTISJAMES|JAMESOTIS
+DNANREFLE|FERNANDEL
+1. Plant with foliage wider than a blade<BROADLEAF>|NON
+2. Branded tissues<KLEENEXES>|NON
+3. Monarchists<ROYALISTS>|JDN
+4. One being sworn in<OATHTAKER>|JDN
+5. Pulitzer Prize–winning novel by Jeffrey Eugenides<MIDDLESEX>|NON
+6. Stave or starch<STIFFENER>|NON
+7. Inanity<SILLINESS>|015
+8. Umber or ocher<EARTHTONE>|WED
+9. Where a mast might be placed<AMIDSHIPS>|NON
+10. Alma mater of Helen Keller and Benazir Bhutto<RADCLIFFE>|NON
+11. Capos<MOBBOSSES>|NON
+12. Founding owner of the Pittsburgh Steelers<ARTROONEY>|WED
+13. Stick<GEARSHIFT>|FRI
+14. Parks and ball pits, e.g.<PLAYAREAS>|NON
+15. Beleted<CLOBBERED>|NON
+16. Leveling (out)<SMOOTHING>|NON
+17. Deadpan comedy duo of old radio and TV<BOBANDRAY>|015
+18. Textiles<SOFTGOODS>|NON
+19. Bishop's underling<LAYREADER>|JDN
+20. Able to decide for oneself<EMPOWERED>|JDN
+21.  "I love you __ and back"<TOTHEMOON>|NON
+22. NBA scoring leader, 1974-76<BOBMCADOO>|FRI
+23. Used one's legs while swimming<SCISSORED>|JDN
+24. The Creation, to indigenous Australians<DREAMTIME>|WED
+25. Like small camping tents<TWOPERSON>|NON
+26. Advancement at any cost<CAREERISM>|JDN
+27. Linguist's concern<SEMANTICS>|FRI
+28. Recurrent musical theme<LEITMOTIF>|NON
+29. Caribbean natives, e.g.<ISLANDERS>|JDN
+30. Southern hickory<PECANTREE>|NON
+31. Bostonian who coined the phrase "Taxation without representation is tyranny"<JAMESOTIS>|JDN
+32. Single-named French comic actor<FERNANDEL>|NON
+AFB  AKE  AND  EMO  ERN  ING  ISL  KLE  LIN  OYA  PEC  RIS  SJA  TRO
+`},
+          {
+            id: 3,
+            data: `
+BHSARTSNI|TRASHBINS
+ODTHEPEQU|THEPEQUOD
+REBREEDRA|RAREBREED
+INSEMANKC|NICKNAMES
+UQETIZTRA|QUARTZITE
+ARDSCAPEH|HARDSCAPE
+CEDGNIEER|DECREEING
+AMEPLAYAG|PLAYAGAME
+ZITOCRANE|NARCOTIZE
+ACSEROTAL|ESCALATOR
+INGREHEAT|REHEATING
+GAYBLADES|GAYBLADES
+ENAJNIALP|PLAINJANE
+LATEPERCO|PERCOLATE
+TAEREVORE|OVEREATER
+VARNISHER|VARNISHER
+ALBTUOSKN|BLANKSOUT
+INJAYSPOP|POPINJAYS
+EPELLINGR|REPELLING
+VERSFORGI|FORGIVERS
+SINOSRAST|ARSONISTS
+POPPEDOUT|POPPEDOUT
+RGNITSSYA|STINGRAYS
+IGRAMMILL|MILLIGRAM
+TSAMEROFS|FOREMASTS
+DEPPARTNE|ENTRAPPED
+STIHCNICA|ITSACINCH
+MMAHTUORE|HAMMEROUT
+REMSNAIDI|MERIDIANS
+ACIOUSRAP|RAPACIOUS
+EROSRANCH|RANCHEROS
+IDINGOUTH|HIDINGOUT
+1. Garbage cans<TRASHBINS>|NON
+2. "Moby-Dick" setting<THEPEQUOD>|FRI
+3. Unusual sort<RAREBREED>|NY0
+4. Monikers<NICKNAMES>|NY0
+5. Kind of metasandstone<QUARTZITE>|NON
+6. Patios, walkways, etc.<HARDSCAPE>|NON
+7. Making pronouncements<DECREEING>|010
+8. Relieve boredom, in a way<PLAYAGAME>|NON
+9. Stupefy<NARCOTIZE>|NON
+10. Train station conveyor<ESCALATOR>|WED
+11. Preparing, as leftovers<REHEATING>|015
+12. Dashing swordsmen<GAYBLADES>|NON
+13. Hardly a beauty queen<PLAINJANE>|WED
+14. Filter (through)<PERCOLATE>|JDN
+15. One with a tummy ache, perhaps<OVEREATER>|JDN
+16. One finishing furniture<VARNISHER>|NON
+17. Can't think of a thing<BLANKSOUT>|NON
+18. Fops<POPINJAYS>|010
+19. Pushing away<REPELLING>|NON
+20. Tolerant ones<FORGIVERS>|JDN
+21. Torchbearers?<ARSONISTS>|JDN
+22. Skied one to the shortstop<POPPEDOUT>|NON
+23. Dangerous bottom feeders<STINGRAYS>|WED
+24. Small weight<MILLIGRAM>|JDN
+25. Supporters of spinnakers<FOREMASTS>|NON
+26. Performed a sting on<ENTRAPPED>|NON
+27. "Easy-peasy!"<ITSACINCH>|WED
+28. Successfully negotiate<HAMMEROUT>|JDN
+29. Great circles of constant longitude<MERIDIANS>|NON
+30. Greedy<RAPACIOUS>|NON
+31. Hacienda workers<RANCHEROS>|JDN
+32. Underground, perhaps<HIDINGOUT>|015
+ANS  CKN  DEC  DES  ENT  NGO  NKS  ODT  OUS  REB  RSO  SHB  SRA  VAR
+`},
+          {
+            id: 4,
+            data: `
+BSPMACTOO|BOOTCAMPS
+DSJEREMIA|JEREMIADS
+CRETIONSE|SECRETION
+OOTCUBICF|CUBICFOOT
+AIMADACAM|MACADAMIA
+ESNOSAERE|SEEREASON
+CESLANOIT|SECTIONAL
+BUCSTOORE|CUBEROOTS
+ADAPTEDUN|UNADAPTED
+ASOGETSRU|STEGOSAUR
+NALFLANOD|ALFLANDON
+EROMESUOH|MOREHOUSE
+NUDEPPOTS|UNSTOPPED
+URSIDRETP|DISRUPTER
+DONEHTTEG|GETTHENOD
+TNETSPALF|TENTFLAPS
+SEMMSIREM|MESMERISM
+PPEDCATNA|CATNAPPED
+RDISCUSSE|DISCUSSER
+THEAIROFF|OFFTHEAIR
+PSTAMECAL|PLACEMATS
+ANTLEDISM|DISMANTLE
+ESSAVNACD|CANVASSED
+FFOYRRUCS|SCURRYOFF
+LACTUARIA|ACTUARIAL
+DELARENTA|DELARENTA
+NVANHEFLI|VANHEFLIN
+RRYCOMOPE|PERRYCOMO
+AUTOLOANS|AUTOLOANS
+ILFENCERA|RAILFENCE
+EPOTRAEHN|OPENHEART
+SNAIDEMOC|COMEDIANS
+1. Military trials?<BOOTCAMPS>|FRI
+2. Prolonged complaints<JEREMIADS>|WED
+3. Glandular action<SECRETION>|JDN
+4. 7.48 gallons<CUBICFOOT>|NON
+5. Nut from Hawaii<MACADAMIA>|JDN
+6. Overcome irrationality<SEEREASON>|WED
+7. Sofa with multiple arrangements<SECTIONAL>|NON
+8. 2 for 8, and 3 for 27<CUBEROOTS>|NON
+9. Not suited to new conditions<UNADAPTED>|NON
+10. Literally, "roof lizard"<STEGOSAUR>|FRI
+11. Sufferer of a crushing defeat in 1936<ALFLANDON>|NY0
+12. Atlanta college<MOREHOUSE>|NON
+13. Took out the cork<UNSTOPPED>|NON
+14. Wrench in the works<DISRUPTER>|JDN
+15. Receive permission<GETTHENOD>|JDN
+16. Camping closures<TENTFLAPS>|NON
+17. Hypnosis<MESMERISM>|NON
+18. Got forty winks<CATNAPPED>|NON
+19. One in a topical conversation<DISCUSSER>|NON
+20. Like most new shows, within a year<OFFTHEAIR>|JDN
+21. Diner souvenirs<PLACEMATS>|JDN
+22. Take apart<DISMANTLE>|WED
+23. Solicited<CANVASSED>|FRI
+24. Flee like mice<SCURRYOFF>|WED
+25. Of an insurance job<ACTUARIAL>|JDN
+26. Dominican designer Oscar<DELARENTA>|NON
+27. Star of "Green Dolphin Street" (1947)<VANHEFLIN>|NON
+28. Cardiganed crooner of 1950s TV<PERRYCOMO>|WED
+29. GMAC offerings, once<AUTOLOANS>|JDN
+30. Common property divider<RAILFENCE>|JDN
+31. Symbol of generosity<OPENHEART>|NY0
+32. Funny people<COMEDIANS>|NON
+ART  CRE  DSJ  EDI  EMA  ENC  ENT  HOU  ICF  MER  NTA  OLO  PSB  SEC
+`},
+          {
+            id: 5,
+            data: `
+BXATNEDRU|TAXBURDEN
+FUMIGATED|FUMIGATED
+OLSTNAPGN|LONGPANTS
+URDLEMONC|LEMONCURD
+DETERRENT|DETERRENT
+NGPRESAGI|PRESAGING
+AMALLSANT|MALLSANTA
+MELCNITNE|INCLEMENT
+RREFNOCDE|CONFERRED
+SERDEDNUO|RESOUNDED
+SLLIKSTOH|KILLSHOTS
+ENTPOLEST|TENTPOLES
+EDCONVINC|CONVINCED
+OUNDSCONF|CONFOUNDS
+HOTHEADED|HOTHEADED
+JUMPERSKI|SKIJUMPER
+LOPSEZIRA|POLARIZES
+VNOILIMRE|VERMILION
+CSDAOLTRA|CARTLOADS
+AEHCEHENN|ANNEHECHE
+REPORATSA|OPERASTAR
+ERMONIZES|SERMONIZE
+ARTAGNILI|RAILINGAT
+NNEEDALOA|NEEDALOAN
+ASTLETHEC|THECASTLE
+INODESOPM|IMPOSEDON
+NGABSENTI|ABSENTING
+ADEMORDNA|ANDROMEDA
+TELAWESTA|ESTATELAW
+ITNEVESED|EVENTIDES
+ANDBOXESB|BANDBOXES
+ATSILAROM|AMORALIST
+1. IRS's share<TAXBURDEN>|NON
+2. Attacked an infestation<FUMIGATED>|NON
+3. Trousers<LONGPANTS>|NY1
+4. Tangy pie filling<LEMONCURD>|NON
+5. Disincentive<DETERRENT>|NON
+6. Foretelling<PRESAGING>|JDN
+7. One might start working on Black Friday<MALLSANTA>|015
+8. Difficult, as weather<INCLEMENT>|NON
+9. Bestowed<CONFERRED>|JDN
+10. Thundered<RESOUNDED>|NY1
+11. Volleyball spikes, say<KILLSHOTS>|WED
+12. Circus props<TENTPOLES>|WED
+13. Persuaded<CONVINCED>|NON
+14. Astonishes<CONFOUNDS>|NON
+15. Impetuous<HOTHEADED>|JDN
+16. Olympic flyer<SKIJUMPER>|NON
+17. Sorts into opposing camps<POLARIZES>|NY0
+18. Red<VERMILION>|JDN
+19. Tons<CARTLOADS>|NON
+20. Actress with the memoir "Call Me Crazy"<ANNEHECHE>|FRI
+21. Met notable<OPERASTAR>|FRI
+22. Get preachy<SERMONIZE>|NON
+23. Loudly complaining about<RAILINGAT>|JDN
+24. Have liquidity problems, maybe<NEEDALOAN>|NON
+25. Unfinished Kafka novel<THECASTLE>|NON
+26. Took advantage of, as in overstaying a welcome<IMPOSEDON>|JDN
+27. __ oneself (staying away)<ABSENTING>|WED
+28. Wife of Perseus<ANDROMEDA>|FRI
+29. Passing legislation?<ESTATELAW>|FRI
+30. Darkening parts of days, once<EVENTIDES>|010
+31. Milliner's cylindrical containers<BANDBOXES>|NON
+32. One with no ethical code<AMORALIST>|NON
+ALI  AMA  ARI  ARO  AWE  AXB  BOX  EST  EVE  FUM  JUM  MPO  ONC  SLO
+`},
+          {
+            id: 6,
+            data: `
+YKANDINSK|KANDINSKY
+KCUBELCNU|UNCLEBUCK
+UFFCREAMP|CREAMPUFF
+KSNAKEMIL|MILKSNAKE
+UNCSQUIDN|QUIDNUNCS
+PMACSLLEB|CAMPBELLS
+EDEINTERC|INTERCEDE
+EKATSNWOD|TAKEDOWNS
+UQSEZITNA|QUANTIZES
+LSCLUBGIR|GIRLSCLUB
+TNIEVISUR|INTRUSIVE
+DOWTHEWIN|THEWINDOW
+ANTLYINST|INSTANTLY
+RIGHTSIZE|RIGHTSIZE
+RUSHESBUL|BULRUSHES
+RCAREGIVE|CAREGIVER
+EHTOSYUGR|OTHERGUYS
+IYLESNEMM|IMMENSELY
+STHCAYNAM|YACHTSMAN
+SEHTSYADE|THESEDAYS
+GERGGAETA|AGGREGATE
+MMERSBYSO|SOMMERSBY
+MANEMANSE|NAMENAMES
+EDATEBYAC|BETADECAY
+ATECITYST|CITYSTATE
+BSROODNRA|BARNDOORS
+AMELOSEAG|LOSEAGAME
+BETTYFORD|BETTYFORD
+TICOSPOLI|POLITICOS
+GAEMITDOO|AGOODTIME
+DROHCTSOL|LOSTCHORD
+ILOVIRFYT|FRIVOLITY
+1. Abstract artist Wassily<KANDINSKY>|JDN
+2. John Candy title role<UNCLEBUCK>|WED
+3. Bakery confection<CREAMPUFF>|NON
+4. Colorful North American reptile<MILKSNAKE>|JDN
+5. Busybodies and newsmongers<QUIDNUNCS>|NON
+6. Soup can word<CAMPBELLS>|NY0
+7. Become involved (in a matter)<INTERCEDE>|WED
+8. Wrestling successes<TAKEDOWNS>|NON
+9. Divides into discreet amounts, as energy<QUANTIZES>|NON
+10. Sorority, e.g.<GIRLSCLUB>|NON
+11. Like a buttinsky<INTRUSIVE>|JDN
+12. Goes out __ (is lost)<THEWINDOW>|NON
+13. At once<INSTANTLY>|NON
+14. Set at the proper level, as a work force<RIGHTSIZE>|NY0
+15. Baby Moses was found among them<BULRUSHES>|NON
+16. Nurse or doctor<CAREGIVER>|NON
+17. 2010 Ferrell-Wahlberg comedy, with "The"<OTHERGUYS>|NON
+18. Quite a lot<IMMENSELY>|015
+19. Regatta participant<YACHTSMAN>|NON
+20. In recent times<THESEDAYS>|NON
+21. Pile up<AGGREGATE>|015
+22. 1993 Gere-Foster period drama<SOMMERSBY>|NON
+23. Sing to HUAC, e.g.<NAMENAMES>|JDN
+24. Process that may transform a neutron into a proton<BETADECAY>|JDN
+25. Sparta, for one<CITYSTATE>|WED
+26. They keep the livestock in<BARNDOORS>|NON
+27. Fall out of first place, maybe<LOSEAGAME>|WED
+28. Namesake of a rehab center<BETTYFORD>|NON
+29. Party people?<POLITICOS>|WED
+30. "__ was had by all"<AGOODTIME>|JDN
+31. 1977 Arthur Sullivan song, with "The"<LOSTCHORD>|JDN
+32. Merriment<FRIVOLITY>|NON
+AGG  ARN  EDE  MIL  OSP  RCA  RGU  RIV  TCH  TIM  UCK  UFF  WIN  YKA
+`},
+          {
+            id: 7,
+            data: `
+HRROGOLAE|LOGORRHEA
+XAOCYLGNI|COAXINGLY
+SFLOTILLA|FLOTILLAS
+EALHAPPYM|HAPPYMEAL
+INGINTOGO|GOINGINTO
+ALLOUSLYC|CALLOUSLY
+UTTALKITO|TALKITOUT
+PAHGNINEP|HAPPENING
+TNIETARGE|INTEGRATE
+SUOIRUCNI|INCURIOUS
+KLAWPUCRE|WALKERCUP
+PENSTSITO|NEPOTISTS
+EGRESSING|EGRESSING
+INCULCATE|INCULCATE
+ERCOUTURI|COUTURIER
+HOOPITUPW|WHOOPITUP
+STSMELLIE|SMELLIEST
+SSEBORKLI|SILKROBES
+CLUTCHING|CLUTCHING
+TUOSREDIR|OUTRIDERS
+TIPLEXMUL|MULTIPLEX
+ILKWHOLEM|WHOLEMILK
+GNIREDROB|BORDERING
+RIDPAEHCT|DIRTCHEAP
+LUMBERERS|SLUMBERER
+OHWGNIHSO|WHOOSHING
+DERTAXEVA|TAXEVADER
+EAPPELLAT|APPELLATE
+REBMEMERS|REMEMBERS
+AVERAGING|AVERAGING
+TALFSEXAT|FLATTAXES
+SREKNULEP|SPELUNKER
+1. Excessive talkativeness, facetiously<LOGORRHEA>|NON
+2. In a way meant to nudge on along<COAXINGLY>|NON
+3. Warship assemblies<FLOTILLAS>|JDN
+4. It includes a cheap toy<HAPPYMEAL>|NY1
+5. Entering, as a field<GOINGINTO>|NON
+6. Without regard for one's feelings<CALLOUSLY>|JDN
+7. Turn a fight into a conversation<TALKITOUT>|010
+8. Taking place<HAPPENING>|NON
+9. Make whole<INTEGRATE>|WED
+10. Devoid of inquisitiveness<INCURIOUS>|NY0
+11. International amateur golf competition<WALKERCUP>|NON
+12. They hire their relatives<NEPOTISTS>|JDN
+13. Leaving the theater<EGRESSING>|JDN
+14. Teach by frequent repetition, as a habit<INCULCATE>|NON
+15. High-end fashion designer<COUTURIER>|010
+16. Cheer noisily<WHOOPITUP>|JDN
+17. Most foul<SMELLIEST>|JDN
+18. Luxuriant after-bath outfits<SILKROBES>|JDN
+19. Grasping<CLUTCHING>|NON
+20. Forerunners<OUTRIDERS>|NON
+21. Movie theater, of a kind<MULTIPLEX>|NON
+22. Half of half-and-half<WHOLEMILK>|015
+23. Abutting, geographically<BORDERING>|JDN
+24. At rock bottom prices<DIRTCHEAP>|WED
+25. One snoozing<SLUMBERER>|NON
+26. Making a rushing sound<WHOOSHING>|NON
+27. IRS cheat<TAXEVADER>|FRI
+28. Kind of court<APPELLATE>|NY1
+29. Calls up<REMEMBERS>|NY0
+30. Finding the means?<AVERAGING>|NY0
+31. They're not progressive<FLATTAXES>|NON
+32. Cavern explorer<SPELUNKER>|FRI
+ESF  HOO  LEX  LIE  MEM  OAX  OSH  OTI  PYM  RAG  RRH  SFL  UNK  UTT
+`},
+          {
+            id: 8,
+            data: `
+BCLUCKDUM|DUMBCLUCK
+LEAREYEDC|CLEAREYED
+BSTELECAR|BRACELETS
+MUDKCURTP|DUMPTRUCK
+CDEDLOKCU|CUCKOLDED
+RACMIJYER|JIMCARREY
+VATINGELE|ELEVATING
+UCKETNANT|NANTUCKET
+OLDJELLOM|JELLOMOLD
+JIMMYDEAN|JIMMYDEAN
+GNITEEMAA|AAMEETING
+TNASAEPYR|PEASANTRY
+MOLUMENTE|EMOLUMENT
+NAEBYLLEJ|JELLYBEAN
+AAMHOWDYM|HOWDYMAAM
+EKSUMREET|MUSKETEER
+EASIDETAK|TAKEASIDE
+EMUFREPYR|PERFUMERY
+LYBURNING|BURNINGLY
+WOHEARTST|TWOHEARTS
+RMULTIUSE|MULTIUSER
+RYPMUBEDI|BUMPYRIDE
+GNILKCERF|FRECKLING
+TSTAOCNRU|TURNCOATS
+ESUOMSRAE|MOUSEEARS
+BUMROCKAL|ROCKALBUM
+CKLATSSOR|CROSSTALK
+COASTWEST|WESTCOAST
+SMOLESTER|MOLESTERS
+ROSIVECOR|CORROSIVE
+TSEALOSTA|LOSTATSEA
+RETILOWTS|TWOLITERS
+1. Silly goose relative<DUMBCLUCK>|NON
+2. Sharp and unbiased<CLEAREYED>|NON
+3. Bangles and cuffs<BRACELETS>|NON
+4. Quick-offloading conveyance<DUMPTRUCK>|NON
+5. Betrayed by a spouse<CUCKOLDED>|JDN
+6. "Liar Liar" star<JIMCARREY>|NY0
+7. Promoting<ELEVATING>|010
+8. Noted whaling port, once<NANTUCKET>|NY0
+9. Dessert shaper<JELLOMOLD>|FRI
+10. Country singer and sausage entrepreneur<JIMMYDEAN>|JDN
+11. First-name-only gathering<AAMEETING>|015
+12. Serfdom<PEASANTRY>|NON
+13. Compensation, in the Constitution<EMOLUMENT>|WED
+14. Colorful item in a jar<JELLYBEAN>|015
+15. Greeting from Tex, perhaps<HOWDYMAAM>|NY0
+16. One of a Dumas trio<MUSKETEER>|010
+17. Have a private word with<TAKEASIDE>|NON
+18. Scent factory<PERFUMERY>|NON
+19. With intensity<BURNINGLY>|NON
+20. Common bridge contract<TWOHEARTS>|NON
+21. Like many online games<MULTIUSER>|NON
+22. Hard time<BUMPYRIDE>|FRI
+23. Getting spotted<FRECKLING>|JDN
+24. Traitors<TURNCOATS>|NON
+25. Headgear for Annette and Cubby<MOUSEEARS>|010
+26. "Layla" or "The Dark Side of the Moon"<ROCKALBUM>|NON
+27. Incidental chatter<CROSSTALK>|015
+28. PST region<WESTCOAST>|JDN
+29. Teasers<MOLESTERS>|FRI
+30. Like an etcher's acid<CORROSIVE>|WED
+31. Drifting, possibly<LOSTATSEA>|JDN
+32. Common soda bottle capacity<TWOLITERS>|NY0
+ALO  BCL  IVE  KAL  LEA  LES  LTI  OLI  PTR  RYP  SKE  TAK  TSB  VAT
+`},
+          {
+            id: 9,
+            data: `
+OPDIMSTNI|MIDPOINTS
+TFOSORCIM|MICROSOFT
+XIECRATDI|DIXIECRAT
+INTCANSPA|PAINTCANS
+MICKERSMI|MIMICKERS
+IDTNEIROS|DISORIENT
+OMMISSARC|COMMISSAR
+NACARTAGE|CARTAGENA
+REKOMSGNI|SMOKERING
+IENHCSRED|SCHNEIDER
+SSICKROOM|SICKROOMS
+EGAHERTZM|MEGAHERTZ
+INGOBYTRA|GOBYTRAIN
+DERATESMO|MODERATES
+MOOZERSCH|SCHMOOZER
+ENHGUORKC|ROUGHNECK
+REHGNIKDO|KINGHEROD
+YBOSSPART|PARTYBOSS
+ETANODALL|DONATELLA
+REZINOILS|LIONIZERS
+OUGHENERT|TOUGHENER
+TRAVELING|TRAVELING
+LLABTIPSS|SPITBALLS
+SLIPPEDON|SLIPPEDON
+TREPUCONI|CUPERTINO
+LEVELSOFF|LEVELSOFF
+ITBOBPETT|BOBPETTIT
+EPPASIDRA|DISAPPEAR
+CUPBUTTER|BUTTERCUP
+TTERERSLE|LETTERERS
+ARDEDUPBO|BOARDEDUP
+RETNELISA|SILENTERA
+1. Bisectors pass through them<MIDPOINTS>|NY1
+2. Source of the Gates fortune<MICROSOFT>|WED
+3. Onetime Strom Thurmond designation<DIXIECRAT>|015
+4. Benjamin Moore containers<PAINTCANS>|JDN
+5. MOckingbirds, e.g.<MIMICKERS>|NON
+6. Addle<DISORIENT>|FRI
+7. Soviet boss<COMMISSAR>|NON
+8. Spanish port<CARTAGENA>|JDN
+9. Cigar user's formation<SMOKERING>|NON
+10. Gin rummy shutout<SCHNEIDER>|FRI
+11. Recuperation areas of old<SICKROOMS>|NON
+12. Number on a dial<MEGAHERTZ>|NY0
+13. Take the Silver Meteor<GOBYTRAIN>|NON
+14. Officiates at a debate<MODERATES>|JDN
+15. One skilled in small talk<SCHMOOZER>|NON
+16. Thug<ROUGHNECK>|WED
+17. Famed Judean ruler<KINGHEROD>|NON
+18. Ward heeler's higherup<PARTYBOSS>|NON
+19. Gianni Versace's sis<DONATELLA>|JDN
+20. Those heaping public approval<LIONIZERS>|JDN
+21. Callus former<TOUGHENER>|NON
+22. __ salesman<TRAVELING>|JDN
+23. Throws out random ideas<SPITBALLS>|NON
+24. Got into, as some shoes<SLIPPEDON>|NON
+25. Apple headquarters<CUPERTINO>|NON
+26. Becomes less variable<LEVELSOFF>|NON
+27. First NBA player to score 20,000 points (1964)<BOBPETTIT>|JDN
+28. Dematerialize<DISAPPEAR>|JDN
+29. Yellow flower<BUTTERCUP>|WED
+30. Some signmakers<LETTERERS>|JDN
+31. Like windows in some derelict buildings<BOARDEDUP>|NON
+32. It ended in the early 1930s<SILENTERA>|FRI
+BUT  DPO  EDU  HEN  HNE  LEN  ODK  OFF  OFT  OMM  RER  SPA  TZM  XIE
+`},
+          {
+            id: 10,
+            data: `
+JKSIMMONS|JKSIMMONS
+AWBUSRACY|SUBWAYCAR
+RESSCLUBP|PRESSCLUB
+SNOZALBME|EMBLAZONS
+YCAIDEMMI|IMMEDIACY
+PBUTTERSU|BUTTERSUP
+REHCNILCS|CLINCHERS
+LAZAHNPAU|PAULAZAHN
+EDIARDERR|REDRAIDER
+ETTESBAGU|BAGUETTES
+INCLEFTCH|CLEFTCHIN
+UAPEVIGES|GIVEPAUSE
+RRELSONHA|HARRELSON
+UGALAIDRA|LAGUARDIA
+HCTIWEBSE|BEWITCHES
+MRSSOFFEL|MRSSOFFEL
+IVELERSSN|SNIVELERS
+OSLOOWSKC|WOOLSOCKS
+IALDRUNKD|DRUNKDIAL
+EWINORLOS|WINORLOSE
+FOSBURCST|SOFTSCRUB
+CKSEDKREL|DESKCLERK
+DKNOCKWOO|KNOCKWOOD
+SOLOSMURD|DRUMSOLOS
+TSCONFRON|CONFRONTS
+KDEPPANDI|KIDNAPPED
+KCORGNITE|ROCKETING
+MSOTIREDI|IMSOTIRED
+FNOCDESSE|CONFESSED
+ETIZERAPP|APPETIZER
+IDEALONGR|RIDEALONG
+ESSKYWRIT|SKYWRITES
+1. Oscar winner for "Whiplash" (2014)<JKSIMMONS>|NON
+2. Underground unit<SUBWAYCAR>|NON
+3. Journalists group<PRESSCLUB>|NON
+4. Decorates brilliantly<EMBLAZONS>|FRI
+5. Urgency<IMMEDIACY>|JDN
+6. Flatters<BUTTERSUP>|JDN
+7. Decisive factors<CLINCHERS>|NON
+8. She's anchored at ABC, CBS, Fox, and CNN<PAULAZAHN>|NON
+9. Texas Tech player<REDRAIDER>|NON
+10. Long, thin loaves<BAGUETTES>|NON
+11. Ben Affleck feature<CLEFTCHIN>|WED
+12. Cause one to reconsider<GIVEPAUSE>|NON
+13. McConaughey's "True Detective" costar<HARRELSON>|NON
+14. Queens landing place<LAGUARDIA>|FRI
+15. Puts a spell on<BEWITCHES>|NON
+16. 1984 title role for Diane Keaton<MRSSOFFEL>|NON
+17. Whiny ones<SNIVELERS>|JDN
+18. Winter warmers<WOOLSOCKS>|NON
+19. Call after a few too many<DRUNKDIAL>|NON
+20. Regardless of the outcome<WINORLOSE>|JDN
+21. Cleanser brand<SOFTSCRUB>|JDN
+22. Hotel front person<DESKCLERK>|WED
+23. Anti-jinxing expression<KNOCKWOOD>|NON
+24. Hard-hitting musical performances?<DRUMSOLOS>|015
+25. Faces head on<CONFRONTS>|NON
+26. Ransomed<KIDNAPPED>|NON
+27. Speeding<ROCKETING>|NON
+28. Beatles song with a complaining title<IMSOTIRED>|FRI
+29. Gave it up to the cops<CONFESSED>|JDN
+30. Cocktail, perhaps<APPETIZER>|WED
+31. Civilian's opportunity to accompany a trooper<RIDEALONG>|015
+32. Sends a message to Dorothy, in a way<SKYWRITES>|NON
+ALO  BWA  EDC  EMB  HER  IDN  JKS  KYW  MRS  RES  RUB  SEG  SSN  ZER
+`},
+          {
+            id: 11,
+            data: `
+JLAIRTYRU|JURYTRIAL
+NUECNALAB|UNBALANCE
+IKETOOKAH|TOOKAHIKE
+URYSALISB|SALISBURY
+BALISMTRI|TRIBALISM
+HAKAKHANC|CHAKAKHAN
+TATTRAOOT|TATTOOART
+LASPACYRA|SALARYCAP
+MSIESTFLI|FLIMSIEST
+HKATEWALS|KATEWALSH
+ARTPUSHST|PUSHSTART
+ARYPROUDM|PROUDMARY
+ILFNIOCAP|FLIPACOIN
+SLAFPETSE|FALSESTEP
+TSHIRTWET|WETTSHIRT
+ERNOVASUP|SUPERNOVA
+ORPNIETAB|INPROBATE
+OINGATITG|GOINGATIT
+EPFRIESDE|DEEPFRIES
+TRIPROUND|ROUNDTRIP
+AVOWEDDIS|DISAVOWED
+GTIPTOEIN|TIPTOEING
+EDSABOTAG|SABOTAGED
+DNUOFSEIR|FOUNDRIES
+SIDSEVORP|DISPROVES
+OTPENOBSC|PENOBSCOT
+OBAMACARE|OBAMACARE
+SFORETELL|FORETELLS
+VESNINELI|NINELIVES
+ERABYGONE|BYGONEERA
+LLEWODCAM|MACDOWELL
+ILELYSTER|STERILELY
+1. Accused's right<JURYTRIAL>|NON
+2. Derange<UNBALANCE>|FRI
+3. Did or didn't participate in the Boy Scouts outing?<TOOKAHIKE>|NY1
+4. __ steak<SALISBURY>|NON
+5. Strong loyalty to one's social group<TRIBALISM>|NON
+6. "I'm Every Woman" (1978) singer<CHAKAKHAN>|JDN
+7. Needlework?<TATTOOART>|NY1
+8. Top sports figure?<SALARYCAP>|FRI
+9. Like the worst excuse<FLIMSIEST>|WED
+10. She's Dr. Addison Montgomery on "Grey's Anatomy"<KATEWALSH>|NON
+11. One way to get the old jalopy going<PUSHSTART>|NON
+12. 1969 hit with the repeated lyric "Big wheel keep on turnin'"<PROUDMARY>|NY1
+13. Decide randomly<FLIPACOIN>|FRI
+14. Slip<FALSESTEP>|JDN
+15. Top in a certain contest<WETTSHIRT>|FRI
+16. Fabulous deli delicacy?<SUPERNOVA>|015
+17. Like some estates<INPROBATE>|NY0
+18. Fighting<GOINGATIT>|NON
+19. Prepares tempura<DEEPFRIES>|NON
+20. Point A to point B and back<ROUNDTRIP>|NY0
+21. Repudiated<DISAVOWED>|NON
+22. Trying to be quiet<TIPTOEING>|FRI
+23. Threw a wrench in the works<SABOTAGED>|JDN
+24. Casting factories<FOUNDRIES>|NON
+25. Invalidates<DISPROVES>|NON
+26. Indigenous people of Maine, with "the"<PENOBSCOT>|NON
+27. Aka the ACA<OBAMACARE>|FRI
+28. Heralds<FORETELLS>|NY1
+29. Friskies alternative<NINELIVES>|FRI
+30. Time past<BYGONEERA>|FRI
+31. Actress Andie<MACDOWELL>|WED
+32. How one with writer's block works<STERILELY>|FRI
+ALJ  BAT  BSC  BYG  DOW  ERN  EUN  IKE  ISB  LYS  NIN  TAT  UDM  WED
+`},
+          {
+            id: 12,
+            data: `
+NHRAPBROW|HRAPBROWN
+CNEMALFSO|FLAMENCOS
+EEPSWOHSP|PEEPSHOWS
+WORDPLAYS|SWORDPLAY
+OSFORABPA|BAROFSOAP
+PSHEADLAM|HEADLAMPS
+HEDGEROWS|HEDGEROWS
+LPDENOOTA|PLATOONED
+AROIDSPOL|POLAROIDS
+DAERDUOLA|READALOUD
+REGOLFSCO|GOLFSCORE
+ATOLELOHW|AWHOLELOT
+LOPHTRONE|NORTHPOLE
+ALOGUESDI|DIALOGUES
+OCSYORUDR|CORDUROYS
+ORWOODFLO|WOODFLOOR
+LELDNACTI|CANDLELIT
+RTHOTICSO|ORTHOTICS
+EUGAVSSEN|VAGUENESS
+ROYAMYTLA|MAYORALTY
+DOOFSMETI|FOODITEMS
+OSCOMMAND|COMMANDOS
+NESBARITO|BARITONES
+ALTRANSVA|TRANSVAAL
+ITEBUOYMA|YOUBETIAM
+MMODERNIS|MODERNISM
+RABDEKCAR|BARRACKED
+NARRATING|NARRATING
+OUBTABLED|DOUBTABLE
+RACSIDRED|DISCARDER
+GNINOOKED|DEKOONING
+DELIATTAR|RATTAILED
+1. Onetime SNCC and Black Panther Party activist<HRAPBROWN>|NON
+2. Andalusian dances<FLAMENCOS>|NON
+3. Olden pornographic viewings<PEEPSHOWS>|NON
+4. Part of a swashbuckler<SWORDPLAY>|JDN
+5. Cake kept in a dish<BAROFSOAP>|WED
+6. Street illuminators<HEADLAMPS>|NON
+7. Shrubs around a field<HEDGEROWS>|JDN
+8. Divided duties in leftfield, e.g.<PLATOONED>|NON
+9. Nearly instant photos<POLAROIDS>|NON
+10. Entertained the kids, in a way<READALOUD>|015
+11. Eagle, for example<GOLFSCORE>|010
+12. __ of nothing (big zero)<AWHOLELOT>|NON
+13. Starting point for an annual flight<NORTHPOLE>|JDN
+14. Most of Plato's works<DIALOGUES>|NON
+15. Ribbed fabrics<CORDUROYS>|NON
+16. Household boards<WOODFLOOR>|NON
+17. Like romantic dinners<CANDLELIT>|NON
+18. Medical field related to prosthetics<ORTHOTICS>|JDN
+19. Obscurity<VAGUENESS>|NON
+20. Local office<MAYORALTY>|JDN
+21. Menu listings<FOODITEMS>|NY0
+22. Elite special forces<COMMANDOS>|JDN
+23. Mariano Stabile et al.<BARITONES>|WED
+24. Historic South African region divided in 1994<TRANSVAAL>|NY0
+25. "That's me all over!"<YOUBETIAM>|NON
+26. Self-conscious break with classical ideals, as in art<MODERNISM>|NON
+27. Lodged at the base<BARRACKED>|NON
+28. Doing a voiceover<NARRATING>|NON
+29. Not clearly true<DOUBTABLE>|NON
+30. One tossing<DISCARDER>|NON
+31. Abstract expressionist Willem<DEKOONING>|JDN
+32. Sporting a narrow little braid<RATTAILED>|NON
+AYS  DIS  ENC  HED  ITC  MSF  NHR  NIS  OON  ORW  PEE  TAB  TAI  WHO
+`},
+          {
+            id: 13,
+            data: `
+OVSNOITAC|VOCATIONS
+YBBOBYALF|BOBBYFLAY
+LTNEDURPY|PRUDENTLY
+CATEEXPLI|EXPLICATE
+FLAGUNION|UNIONFLAG
+YPRETTYBO|PRETTYBOY
+ROMRANUDE|UNARMORED
+XEERENIMA|REEXAMINE
+NUGRADARS|RADARGUNS
+TTERGERDE|REGRETTED
+NARCHISMA|ANARCHISM
+AMIDALPYR|PYRAMIDAL
+SRACATNER|RENTACARS
+EDRKILDAR|DRKILDARE
+AMSTELEGR|TELEGRAMS
+TSEILLIHC|CHILLIEST
+LADNERBEE|BRENDALEE
+TACRIAFHC|FAIRCATCH
+LIKINGDIS|DISLIKING
+LETITSNOW|LETITSNOW
+LLIWETROF|WILLFORTE
+CHFRYFREN|FRENCHFRY
+SIDECHAIR|SIDECHAIR
+WONNIWGNI|WINNOWING
+FORTERSTI|RETROFITS
+FYRROSLEE|FEELSORRY
+HCEESEBRE|BESEECHER
+WINDLINGD|DWINDLING
+RETARGETS|RETARGETS
+ERBMOSSOR|SOMBREROS
+DGNIVRESE|DESERVING
+STEPCHILD|STEPCHILD
+1. Callings<VOCATIONS>|NON
+2. Food Network chef<BOBBYFLAY>|NY1
+3. In a cautious way<PRUDENTLY>|JDN
+4. Elucidate<EXPLICATE>|NON
+5. UK symbol<UNIONFLAG>|NON
+6. Handsome Dan<PRETTYBOY>|FRI
+7. Not fitted for combat<UNARMORED>|NON
+8. Take another good look at<REEXAMINE>|FRI
+9. Fastball measurers<RADARGUNS>|JDN
+10. Rued<REGRETTED>|NON
+11. Rebel's movement<ANARCHISM>|FRI
+12. Like a Ponzi scheme<PYRAMIDAL>|JDN
+13. Enterprise outlets<RENTACARS>|JDN
+14. Physician of 1930s-'40s films<DRKILDARE>|WED
+15. Some old cables<TELEGRAMS>|FRI
+16. Most unfriendly<CHILLIEST>|JDN
+17. "Rockin' Around the Christmas Tree" singer<BRENDALEE>|NON
+18. Punt returner's option<FAIRCATCH>|JDN
+19. Not taking kindly to<DISLIKING>|NY0
+20. When said three times, a yuletide song<LETITSNOW>|WED
+21. "The Last Man on Earth" star<WILLFORTE>|JDN
+22. McDonalds bit<FRENCHFRY>|NON
+23. It has no arms<SIDECHAIR>|010
+24. Culling<WINNOWING>|NON
+25. Adapts the old model<RETROFITS>|JDN
+26. Pity, with "for"<FEELSORRY>|WED
+27. Pleader<BESEECHER>|NON
+28. Diminishing<DWINDLING>|NON
+29. Sets a new goal<RETARGETS>|NY1
+30. Big hats<SOMBREROS>|NY0
+31. Worthy<DESERVING>|JDN
+32. Marriage acquisition, maybe<STEPCHILD>|NY0
+ARG  BBY  EEB  EEL  EST  MOR  NTL  PCH  PLI  PYR  RVI  SOM  SVO  TEW
+`},
+          {
+            id: 14,
+            data: `
+QUACITYLO|LOQUACITY
+NOTLISAIM|IMNOTLISA
+UCCASEDSL|CULSDESAC
+OLYHPYNEG|PHYLOGENY
+MIASMATIC|MIASMATIC
+LSDOORSIL|DOORSILLS
+NTEDATESA|ANTEDATES
+YPHENATEH|HYPHENATE
+AMSCOUTTE|SCOUTTEAM
+ROOKIETHE|THEROOKIE
+TADYRTNEA|DATAENTRY
+HETATSDOO|STATEHOOD
+ETTSGNANE|TEENANGST
+EHTESRUOC|THECOURSE
+AENSTSEIK|SNEAKIEST
+WORTHATRY|WORTHATRY
+STACKSHOP|TACKSHOPS
+NGSBIRDSO|BIRDSONGS
+RSEIRRAME|REMARRIES
+STSINCERE|SINCEREST
+AHTYAREKC|THACKERAY
+OSDNIWSKC|WINDSOCKS
+EMANHTRIB|BIRTHNAME
+ERESDERRI|DERRIERES
+CKEDPICNI|PICNICKED
+WINGREVIE|REVIEWING
+THNEARDEA|NEARDEATH
+EDSUSPEND|SUSPENDED
+IPDNAHSKC|HANDPICKS
+AEDITAERG|GREATIDEA
+DNEGNIRAE|ENDEARING
+CKSITUPSU|SUCKSITUP
+1. Talkativeness<LOQUACITY>|NY0
+2. 1975 Jessi Colter hit<IMNOTLISA>|JDN
+3. Dead end<CULSDESAC>|JDN
+4. "Ontogeny recapitulates __" (olden biological hypothesis)<PHYLOGENY>|NON
+5. Noxious<MIASMATIC>|NON
+6. Thresholds<DOORSILLS>|NON
+7. Happened before<ANTEDATES>|NON
+8. Break one's word?<HYPHENATE>|NY0
+9. At football practice, they emulate the next opponent<SCOUTTEAM>|NON
+10. Nathan Fillion cop show<THEROOKIE>|FRI
+11. Tedious typing, at times<DATAENTRY>|JDN
+12. Territory's future, perhaps<STATEHOOD>|JDN
+13. Classic subject for rock 'n' roll lyrics<TEENANGST>|FRI
+14. Stay __ (keep going)<THECOURSE>|NON
+15. Most conniving<SNEAKIEST>|JDN
+16. "Took a shot!"<WORTHATRY>|NON
+17. Equestrian supply outlets<TACKSHOPS>|NON
+18. Melodies of nature<BIRDSONGS>|NON
+19. Doesn't give up on matrimony<REMARRIES>|NON
+20. Most heartfelt<SINCEREST>|JDN
+21. William Makepeace __<THACKERAY>|NON
+22. Indicators at an airfield<WINDSOCKS>|WED
+23. Maternity ward certificate datum<BIRTHNAME>|JDN
+24. Backsides<DERRIERES>|JDN
+25. Dined alfresco<PICNICKED>|NON
+26. Going over<REVIEWING>|NON
+27. __ experience (possible afterlife evidence)<NEARDEATH>|NON
+28. Not quite expelled<SUSPENDED>|JDN
+29. Personally selects<HANDPICKS>|NON
+30. "That could work!"<GREATIDEA>|015
+31. Charming<ENDEARING>|JDN
+32. Gamely endures things<SUCKSITUP>|NON
+ATI  CCU  GEN  HAN  HOP  ING  ITU  NOT  NTE  OOD  QUA  RAY  VIE  WOR
+`},
+          {
+            id: 15,
+            data: `
+QWARDKCIU|QUICKDRAW
+DALGOREVI|GOREVIDAL
+IDSRUASON|DINOSAURS
+UICEWAYSL|SLUICEWAY
+IVEDISKDR|DISKDRIVE
+NOSESPROG|PROGNOSES
+ELBAYLAUR|BAYLAUREL
+AWESUOHER|WAREHOUSE
+SIDUALSRE|RESIDUALS
+PSETAEMRE|PERMEATES
+LYAVOIDAB|AVOIDABLY
+REHRETFAE|HEREAFTER
+ERSCAROUS|CAROUSERS
+ERMATTLAU|MATTLAUER
+BADLYBEAT|BEATBADLY
+SSABECIOV|BASSVOICE
+TEROUTFIL|FILTEROUT
+RACIZEOST|OSTRACIZE
+TTAGNITSE|ATTESTING
+BYLDESUME|BEMUSEDLY
+CEBFOESUA|BECAUSEOF
+TSOLOTTUO|LOSTOUTTO
+ESTBREEZI|BREEZIEST
+EMULATING|EMULATING
+AUSSIDSED|DISSUADES
+TOLCHSAWH|WASHCLOTH
+ERBKRADDA|DARKBREAD
+TALLEBEHT|ATTHEBELL
+DISROBING|DISROBING
+ADDNUHSHC|DACHSHUND
+THEMEPARK|THEMEPARK
+GNISDEBEL|SINGLEBED
+1. Hanna-Barbera cartoon character McGraw<QUICKDRAW>|NON
+2. Intellectual who wrote the historical novel "1876"<GOREVIDAL>|015
+3. They were big in the past<DINOSAURS>|NY0
+4. Mill channel<SLUICEWAY>|NON
+5. Computer component<DISKDRIVE>|010
+6. Long-term outlooks<PROGNOSES>|NON
+7. Evergreen source of a flavoring leaf<BAYLAUREL>|JDN
+8. Wholesaler's building<WAREHOUSE>|NON
+9. Some royalties<RESIDUALS>|WED
+10. Seeps through<PERMEATES>|NON
+11. Due to a simple error<AVOIDABLY>|NON
+12. Next life<HEREAFTER>|WED
+13. Debauchers<CAROUSERS>|JDN
+14. Canceled morning TV host<MATTLAUER>|WED
+15. Trounce<BEATBADLY>|NON
+16. Low part<BASSVOICE>|NON
+17. Remove<FILTEROUT>|NON
+18. Freeze out<OSTRACIZE>|WED
+19. Certifying<ATTESTING>|FRI
+20. With confusion<BEMUSEDLY>|NON
+21. Owing to<BECAUSEOF>|NY0
+22. Was passed over for<LOSTOUTTO>|NON
+23. Most carefree<BREEZIEST>|FRI
+24. Copying<EMULATING>|NON
+25. Talks out of it<DISSUADES>|JDN
+26. Face cleaner<WASHCLOTH>|NON
+27. Pumpernickel, e.g.<DARKBREAD>|NON
+28. When trading ceases<ATTHEBELL>|FRI
+29. Stripping<DISROBING>|NY0
+30. Sausage dog<DACHSHUND>|NON
+31. Disney development<THEMEPARK>|WED
+32. Limitation in many a motel room<SINGLEBED>|NON
+ASS  AWQ  DAL  EAF  EDS  ELB  EOF  FIL  HUN  HWA  MEP  ROB  SDI  YSL
+`},
+          {
+            id: 16,
+            data: `
+RBSNETHGI|BRIGHTENS
+UTOCRACYA|AUTOCRACY
+ABLEEHWES|WHEELBASE
+IGHJINKSH|HIGHJINKS
+AYCOURTEN|COURTENAY
+SEWNEVARC|WESCRAVEN
+GARNISHEE|GARNISHEE
+NIJTSEILG|JINGLIEST
+RUOCUATNA|AUCOURANT
+VENTILATE|VENTILATE
+SINGLEOUT|SINGLEOUT
+GLIMMERED|GLIMMERED
+ANTURKEST|TURKESTAN
+ETACOSAUC|TACOSAUCE
+TUORGELIT|TILEGROUT
+IEVNIRELG|INVEIGLER
+EMMENTHAL|EMMENTHAL
+KRUMSSENI|MURKINESS
+SOCKETEYE|EYESOCKET
+EGRAHCERS|RECHARGES
+RINGSIDES|RINGSIDES
+INELYLTNE|LENIENTLY
+EYERRUSSM|RUSSMEYER
+SREIHCTEK|SKETCHIER
+SEDPURCHA|PURCHASED
+LYLGNIGNO|LONGINGLY
+URRIPOTPO|POTPOURRI
+CHITCHATS|CHITCHATS
+RUPLACAIN|CALPURNIA
+OPTIONING|OPTIONING
+STACHIOPI|PISTACHIO
+NIAPPIHCT|PAINTCHIP
+1. Snaps out of a gloomy mood<BRIGHTENS>|NON
+2. Dictatorship<AUTOCRACY>|NON
+3. Spindle-to-axle distance<WHEELBASE>|JDN
+4. Tomfoolery<HIGHJINKS>|FRI
+5. Tom of "Billy Liar" (1963)<COURTENAY>|NON
+6. "A Nightmare on Elm Street" writer/director<WESCRAVEN>|NON
+7. Withhold a debtor's wages<GARNISHEE>|JDN
+8. As tinnily metallic as can be<JINGLIEST>|JDN
+9. Up-to-date<AUCOURANT>|NY1
+10. Air out<VENTILATE>|JDN
+11. Personally focus on, for praise or criticism<SINGLEOUT>|NON
+12. Gleamed<GLIMMERED>|JDN
+13. Region between Siberia and the Gobi Desert<TURKESTAN>|JDN
+14. Condiment at Chipotle<TACOSAUCE>|JDN
+15. Bonding material for bathroom floors<TILEGROUT>|NY1
+16. Wangler<INVEIGLER>|NON
+17. Swiss cheese<EMMENTHAL>|NON
+18. Muddy quality<MURKINESS>|NON
+19. Orbit<EYESOCKET>|015
+20. Plugs in, perhaps<RECHARGES>|NON
+21. Boxing spectator spots<RINGSIDES>|JDN
+22. Not in a harsh way<LENIENTLY>|JDN
+23. Director of "Beneath the Valley of the Ultra-Vixens" (1979)<RUSSMEYER>|NON
+24. Showing less detail<SKETCHIER>|NON
+25. Bought<PURCHASED>|NON
+26. With deep desire<LONGINGLY>|JDN
+27. "Jeopardy!" category<POTPOURRI>|WED
+28. Converses lightly<CHITCHATS>|NON
+29. Julius Caesar's wife<CALPURNIA>|JDN
+30. Sending a rookie back to the minors, in baseball lingo<OPTIONING>|NON
+31. Ice cream flavor<PISTACHIO>|FRI
+32. Color-matching sample, perhaps<PAINTCHIP>|NON
+CAL  CHI  GAR  GSI  HAL  ION  IPP  KSH  LBA  ONG  RED  SBR  UTO  VEI
+`},
+          {
+            id: 17,
+            data: `
+RKROPSDNI|PORKRINDS
+PLOYINGEM|EMPLOYING
+PAINTBALL|PAINTBALL
+INDWOMENK|WOMENKIND
+MEGNOPSPO|SPONGEMOP
+LLAITINIY|INITIALLY
+OWIETIBTN|IWONTBITE
+MOWTREDRU|MURDERTWO
+PONSOREDS|SPONSORED
+ITICUAPSE|PAUCITIES
+ITESOCIAL|SOCIALITE
+URDEESOTN|RUNTOSEED
+SDEBMAERT|STREAMBED
+ESPINKROS|PINKROSES
+LAIREEAUC|EAUCLAIRE
+BILLPECOS|PECOSBILL
+SEEINGFAR|FARSEEING
+AMBRIDGEC|CAMBRIDGE
+KNIFEDULL|DULLKNIFE
+EERDETCEL|REELECTED
+EPLICATER|REPLICATE
+CEGOINGNI|NICEGOING
+LLUFSEDIR|FULLRIDES
+LECTORDEF|DEFLECTOR
+RETWEETED|RETWEETED
+NIOJERGNI|REJOINING
+ESFEDERAT|FEDERATES
+ROTSNRABM|BARNSTORM
+EEWSSGNIP|SWEEPINGS
+TARAOBREJ|JERBOARAT
+MBARGOEDE|EMBARGOED
+PINAYARNS|SPINAYARN
+1. No snack for vegetarians<PORKRINDS>|JDN
+2. Using<EMPLOYING>|NON
+3. Colorful sport<PAINTBALL>|WED
+4. Human females, collectively<WOMENKIND>|JDN
+5. Tile-cleaning tool<SPONGEMOP>|JDN
+6. At first<INITIALLY>|FRI
+7. "No need to be afraid of me"<IWONTBITE>|NON
+8. Manslaughter relative, informally<MURDERTWO>|NON
+9. Provided support for<SPONSORED>|NON
+10. Dearths<PAUCITIES>|JDN
+11. Kim Kardashian or Talita von Fürstenberg<SOCIALITE>|JDN
+12. Deteriorate<RUNTOSEED>|FRI
+13. Panning site<STREAMBED>|NON
+14. Symbols of sweetness and elegance for some<PINKROSES>|NON
+15. Wisconsin city<EAUCLAIRE>|JDN
+16. Lover of Slue-Foot Sue<PECOSBILL>|015
+17. Like one standing the shoulders of giants<FARSEEING>|JDN
+18. Where Stephen Hawking and Charles Darwin went to school<CAMBRIDGE>|NY1
+19. Chef's bane<DULLKNIFE>|NON
+20. Put back in one's office?<REELECTED>|JDN
+21. Copy<REPLICATE>|015
+22. "Good work!"<NICEGOING>|WED
+23. Enviable scholarships, informally<FULLRIDES>|FRI
+24. One skillfully changing the subject<DEFLECTOR>|NON
+25. Sent on to one's followers, in a way<RETWEETED>|JDN
+26. Getting back together<REJOINING>|NON
+27. Joins in an alliance<FEDERATES>|JDN
+28. Campaign from town to town<BARNSTORM>|015
+29. Stuff cleaned from floor<SWEEPINGS>|JDN
+30. Hopping desert rodent<JERBOARAT>|NON
+31. Banned from trade or commerce<EMBARGOED>|JDN
+32. Act the raconteur<SPINAYARN>|015
+AYA  BIL  BOA  ENK  FAR  GSS  ICA  ING  IWO  NTO  PAI  PLO  RGO  RKR
+`},
+          {
+            id: 18,
+            data: `
+SCPTELBAT|TABLETPCS
+KORTSYEKE|KEYSTROKE
+FIERRECTI|RECTIFIER
+TABOLICME|METABOLIC
+EKEYDELET|DELETEKEY
+ITCHERYST|STITCHERY
+OCOIGGERR|CORREGGIO
+ILOPILLAG|GALLIPOLI
+EDYCARCOM|DEMOCRACY
+REHNQUIST|REHNQUIST
+GGIEMAYMA|MAGGIEMAY
+GALFSELOP|FLAGPOLES
+MOCSRELIP|COMPILERS
+TSIREERAC|CAREERIST
+AMYRRAUQN|QUARRYMAN
+USSINIAME|MAINISSUE
+ESFLESEVR|SELFSERVE
+ERSFLOUND|FLOUNDERS
+EERHTSTCA|THREEACTS
+ARRANGERE|REARRANGE
+ININESSSH|SHININESS
+DNUOSSSEL|SOUNDLESS
+ACTORYOLF|OLFACTORY
+EREITISTH|THEREITIS
+HSSIAHGNA|SHANGHAIS
+SSOMEGIRL|SOMEGIRLS
+YROEHTTES|SETTHEORY
+ITICPUORG|CITIGROUP
+HAIRUPEEH|URIAHHEEP
+SETYBAGEM|MEGABYTES
+GROOVETHE|THEGROOVE
+HEEREDUPC|CHEEREDUP
+1. iPad relatives<TABLETPCS>|NON
+2. Data entry movement<KEYSTROKE>|JDN
+3. Device for converting alternating current into direct current<RECTIFIER>|FRI
+4. Of biological processes<METABOLIC>|FRI
+5. It could lead to a reduced sentence<DELETEKEY>|010
+6. Showy sewing<STITCHERY>|NON
+7. Antonio da __ (Renaissance painter)<CORREGGIO>|NON
+8. 1981 Peter Weir war film<GALLIPOLI>|WED
+9. Word after direct or representative<DEMOCRACY>|NON
+10. Chief justice from 1986 to 2005<REHNQUIST>|FRI
+11. Rod Stewart's first #1 hit<MAGGIEMAY>|015
+12. Masts of a sort<FLAGPOLES>|JDN
+13. They turn higher level languages into machine code<COMPILERS>|NON
+14. Ladder climber<CAREERIST>|015
+15. John Lennon or Paul McCartney, early on<QUARRYMAN>|NON
+16. Center of a debate<MAINISSUE>|FRI
+17. Sign seen on some islands<SELFSERVE>|010
+18. Some flatfish<FLOUNDERS>|NON
+19. "Four Saints in __" (Stein)<THREEACTS>|JDN
+20. Scramble anew<REARRANGE>|WED
+21. Reflective quality<SHININESS>|NON
+22. Silent<SOUNDLESS>|FRI
+23. Of the sense of smell<OLFACTORY>|NON
+24. Shout while pointing<THEREITIS>|FRI
+25. Forces to join the ship's crew<SHANGHAIS>|NON
+26. 1978 Rolling Stones album<SOMEGIRLS>|WED
+27. Branch of pure mathematics<SETTHEORY>|JDN
+28. Multinational investment bank and financial services company<CITIGROUP>|NON
+29. Mr. Wickfield's clerk<URIAHHEEP>|FRI
+30. Memory measures<MEGABYTES>|JDN
+31. In __ (totally tuned in)<THEGROOVE>|NON
+32. Turned that frown upside down<CHEEREDUP>|JDN
+ABY  CME  FIE  IRL  NES  OCO  OVE  PCS  POL  PUR  RED  ROK  RVE  SSU
+`},
+          {
+            id: 19,
+            data: `
+SXRAYSPEC|XRAYSPECS
+OGACONEST|CONESTOGA
+UFEHTERUT|THEFUTURE
+CEPTFOREX|EXCEPTFOR
+TSEURTSYA|STAYSTRUE
+TURNALNOC|NOCTURNAL
+OTTICKETH|HOTTICKET
+OFTEASPOT|SPOTOFTEA
+TRUTHERSS|STRUTHERS
+LANDSMAIN|MAINLANDS
+KCIHCDENE|CHICKENED
+TOPTHINON|THINONTOP
+SSRENOSAE|SEASONERS
+NIAERAEHT|INTHEAREA
+ENETRAMSD|SMARTENED
+OWHOUNDCH|CHOWHOUND
+IHTGNELRE|LENGTHIER
+ONEGALLON|ONEGALLON
+AREGUAGNI|RAINGAUGE
+ARTSUAAIL|AUSTRALIA
+NUONTHEME|ONTHEMENU
+NOLSKCENG|LONGNECKS
+INGPILLAG|PILLAGING
+LIARDRAUG|GUARDRAIL
+EMENOPAUS|MENOPAUSE
+CKSLIDERO|ROCKSLIDE
+LIPTREETU|TULIPTREE
+RDREVOSSE|OVERDRESS
+PONGEBOBS|SPONGEBOB
+UTEDUNDIL|UNDILUTED
+ESSALAERT|REALASSET
+SBOROGOVE|BOROGOVES
+1. Novelty glasses in comic book ads<XRAYSPECS>|010
+2. __ wagon<CONESTOGA>|015
+3. "__ ain't what it used to be" (Yogi Berra)<THEFUTURE>|FRI
+4. Save<EXCEPTFOR>|NON
+5. Doesn't stray off course<STAYSTRUE>|NON
+6. Like bats<NOCTURNAL>|NY0
+7. It may be hard to score on Broadway<HOTTICKET>|NY1
+8. It may be taken with lumps<SPOTOFTEA>|JDN
+9. Sally of "All in the Family"<STRUTHERS>|NON
+10. Views from isles, often<MAINLANDS>|WED
+11. Wimped (out)<CHICKENED>|NON
+12. Nearly bald<THINONTOP>|JDN
+13. Ones adjusting the salt<SEASONERS>|NON
+14. Nearby<INTHEAREA>|JDN
+15. Wised (up)<SMARTENED>|NON
+16. Big eater<CHOWHOUND>|NON
+17. More protracted<LENGTHIER>|WED
+18. 128 fluid ounces<ONEGALLON>|NON
+19. Meteorologist's tool<RAINGAUGE>|WED
+20. Jackman's homeland<AUSTRALIA>|FRI
+21. Available<ONTHEMENU>|015
+22. Some beer bottles<LONGNECKS>|JDN
+23. Plundering<PILLAGING>|NON
+24. Road safety feature<GUARDRAIL>|WED
+25. End of the reproductive stage<MENOPAUSE>|NON
+26. Danger for a climber<ROCKSLIDE>|FRI
+27. Yellow poplar<TULIPTREE>|WED
+28. Wear tails to tea, say<OVERDRESS>|010
+29. Squidward's neighbor on Nickelodeon<SPONGEBOB>|FRI
+30. Full strength<UNDILUTED>|NON
+31. Property<REALASSET>|JDN
+32. "Jabberwocky" birds<BOROGOVES>|WED
+ALA  DUN  EFU  ERL  ERO  GEB  NON  NTH  OGA  OTT  OWH  REX  ROG  SXR
+`},
+          {
+            id: 20,
+            data: `
+TSAWOTOGE|GOTOWASTE
+LLSBACKRO|ROLLSBACK
+DOOPTUCEL|POODLECUT
+EGOATSCAP|SCAPEGOAT
+ORKSETTOW|SETTOWORK
+LECASTCAB|CABLECAST
+LUCSERUTP|SCULPTURE
+STANATOMI|ANATOMIST
+TESGIGABY|GIGABYTES
+TSALECALP|LASTPLACE
+RESSEASHO|SEASHORES
+IMOMAHCEL|CHAMOMILE
+YBAYBOTAN|BOTANYBAY
+PLAYSAGIG|PLAYSAGIG
+OHSDRACEL|HOLECARDS
+IRNUSTAES|ATSUNRISE
+HAMIANSBA|BAHAMIANS
+OBYELRAMB|BOBMARLEY
+ASYCHAIRE|EASYCHAIR
+ARDUOLCNI|RAINCLOUD
+TSUNIONIS|UNIONISTS
+BMASECNAI|AMBIANCES
+ERICCARLE|ERICCARLE
+INCIPMAHC|PICNICHAM
+SINGDELOU|DELOUSING
+CESEARPIE|EARPIECES
+ACCESSORY|ACCESSORY
+MPIRTRETE|TRIPMETER
+EDGNINEDA|DEADENING
+YROFSNRAE|YEARNSFOR
+ETENNESSE|TENNESSEE
+ADERFURTR|FURTRADER
+1. Are squandered<GOTOWASTE>|FRI
+2. Illegally alters the odometer<ROLLSBACK>|NON
+3. Short, curly hairdo<POODLECUT>|NY1
+4. Patsy<SCAPEGOAT>|FRI
+5. Roll up one's sleeves<SETTOWORK>|NON
+6. TV offering<CABLECAST>|JDN
+7. It might be a bust<SCULPTURE>|WED
+8. Body studier<ANATOMIST>|NON
+9. Memory chunks<GIGABYTES>|NON
+10. You'll find a trailer in it<LASTPLACE>|FRI
+11. Beaches and such<SEASHORES>|015
+12. __ tea<CHAMOMILE>|NON
+13. Where Captain Cook landed in 1770<BOTANYBAY>|NY1
+14. Performs on stage, in a way<PLAYSAGIG>|NON
+15. Stud revelations<HOLECARDS>|010
+16. When birds might start singing<ATSUNRISE>|NON
+17. Nassau residents<BAHAMIANS>|NY1
+18. "One Love" singer<BOBMARLEY>|NY1
+19. Recliner, e.g.<EASYCHAIR>|015
+20. Potential drought ender<RAINCLOUD>|NON
+21. Labor movement supporters<UNIONISTS>|NON
+22. Atmospheres: var.<AMBIANCES>|NON
+23. "The Very Hungry Caterpillar" author<ERICCARLE>|FRI
+24. Pork shoulder cut<PICNICHAM>|NON
+25. Using RID or Nix<DELOUSING>|NON
+26. Some Secret Service wear<EARPIECES>|JDN
+27. Brooch or bracelet<ACCESSORY>|NON
+28. It measures travel distances<TRIPMETER>|NON
+29. Soundproofing<DEADENING>|JDN
+30. Deeply desires<YEARNSFOR>|NON
+31. One of two states with a Crockett County<TENNESSEE>|FRI
+32. John Jacob Astor, e.g.<FURTRADER>|JDN
+AST  CAP  CUL  LEC  LLS  NIN  NIO  NNE  NRI  NSF  OOD  PIE  RFU  SBA
+`},
+          {
+            id: 21,
+            data: `
+VGABMUUCA|VACUUMBAG
+KROVEKNAI|KEVORKIAN
+OJSDNAHNI|JOINHANDS
+ACUTENESS|ACUTENESS
+IANCOLUMB|COLUMBIAN
+INHARTKEV|KEVINHART
+OMINICAND|DOMINICAN
+NETOMBSTO|TOMBSTONE
+LOCKHEADB|BLOCKHEAD
+TRAEGHTOO|GEARTOOTH
+CINOMANEN|ENCINOMAN
+OTSINCAHO|INCAHOOTS
+BDAUQSBMO|BOMBSQUAD
+OOTTRAEHK|TOOKHEART
+NENTECHGE|GENENTECH
+IDICITAMO|IDIOMATIC
+CNITCATNO|INCONTACT
+SQUERULOU|QUERULOUS
+ARTLOVERS|ARTLOVERS
+CETACEANS|CETACEANS
+TICKTOITS|STICKTOIT
+UOLECNACT|CANCELOUT
+SRESTCURE|RESTCURES
+SNAIKAVOL|SLOVAKIAN
+STIGATECA|CASTIGATE
+NCEDDISTA|DISTANCED
+CTSTRANSE|TRANSECTS
+AKISSBLOW|BLOWAKISS
+TAGNIREEL|LEERINGAT
+ESNEPSIDD|DISPENSED
+WOLSKCART|SLOWTRACK
+LEEPLABSS|SLEEPLABS
+1. Hoover accessory<VACUUMBAG>|NON
+2. Famed assisted suicide doctor<KEVORKIAN>|NON
+3. Unite (with)<JOINHANDS>|FRI
+4. Sharp quality<ACUTENESS>|NON
+5. Of a 1492 voyage<COLUMBIAN>|NON
+6. Standup who starred in "Ride Along"<KEVINHART>|NON
+7. Haitian's neighbor<DOMINICAN>|NON
+8. O.K. Corral town<TOMBSTONE>|WED
+9. Dolt<BLOCKHEAD>|JDN
+10. One engaging in clockwork<GEARTOOTH>|FRI
+11. "Where the stone age meets the rock age" movie<ENCINOMAN>|JDN
+12. Scheming (with)<INCAHOOTS>|JDN
+13. Experts in defusing<BOMBSQUAD>|NON
+14. Cheered up<TOOKHEART>|NY0
+15. Company with the stock ticker symbol DNA<GENENTECH>|WED
+16. Colloquial<IDIOMATIC>|FRI
+17. Touching base (with)<INCONTACT>|FRI
+18. Whiny<QUERULOUS>|NON
+19. Aesthetes<ARTLOVERS>|015
+20. Whales and porpoises<CETACEANS>|NON
+21. Persist<STICKTOIT>|WED
+22. Negate<CANCELOUT>|NON
+23. Old health treatments<RESTCURES>|NON
+24. From Bratislava<SLOVAKIAN>|NON
+25. Severely criticize<CASTIGATE>|JDN
+26. Separated (oneself from)<DISTANCED>|NON
+27. Divides<TRANSECTS>|JDN
+28. Show affection from across a room<BLOWAKISS>|NY0
+29. Ogling wolfishly<LEERINGAT>|NY1
+30. Did without, with "with"<DISPENSED>|010
+31. Mudder's specialty<SLOWTRACK>|JDN
+32. They check for apnea<SLEEPLABS>|NY0
+AGV  AHO  CKS  ESS  IDI  KTO  OMI  ONT  ORK  PLA  RIN  SJO  SPE  STA
+`},
+          {
+            id: 22,
+            data: `
+VMRAFELLI|FARMVILLE
+NOINOWARS|RAWONIONS
+RDEMENTOD|DRDEMENTO
+ILLHANDDR|HANDDRILL
+SRACYTEFA|CARSAFETY
+DOTAEKWON|TAEKWONDO
+IRROWTNEM|WORRIMENT
+NAHORNELE|LENAHORNE
+TYCNALCMO|TOMCLANCY
+KEAPPLECA|APPLECAKE
+TWORTHWHI|WHITWORTH
+ELENIPSSS|SPINELESS
+OMCLEANRO|CLEANROOM
+ACEVOLLAN|LOVECANAL
+IHWRMELPP|MRWHIPPLE
+EHTONAHTR|OTHERTHAN
+PINTOPONY|PINTOPONY
+AELGIBEUG|BIGLEAGUE
+LOVORPENO|PROVOLONE
+EMREGNESS|MESSENGER
+ANOCTSITR|CONARTIST
+GUESTSPOT|GUESTSPOT
+ONETHEBIG|THEBIGONE
+SSEFORPRO|PROFESSOR
+RTIPFINGE|FINGERTIP
+STSALARMI|ALARMISTS
+EHTAMSMAX|MATHEXAMS
+ROFNIEREC|REINFORCE
+IFPUCSLAN|CUPFINALS
+XAMOLNALA|ALANLOMAX
+CERATESMA|MACERATES
+NALLAHEIN|ANNIEHALL
+1. Facebook game launched in 2009<FARMVILLE>|NON
+2. Common burger toppers<RAWONIONS>|JDN
+3. DJ who first promoted "Weird Al" Yankovic<DRDEMENTO>|010
+4. Use a brace and bit<HANDDRILL>|NON
+5. Crash test purpose<CARSAFETY>|NON
+6. Art form offering plenty of kicks?<TAEKWONDO>|015
+7. Trouble, humorously<WORRIMENT>|NON
+8. Subject of the biography "Stormy Weather"<LENAHORNE>|JDN
+9. "Patriot Games" novelist<TOMCLANCY>|015
+10. Fruit tart relative<APPLECAKE>|NON
+11. Kathy who won 88 LPGA tournaments<WHITWORTH>|NON
+12. Cowardly<SPINELESS>|NON
+13. Lint-free factory space<CLEANROOM>|JDN
+14. Early Superfund site in Niagara Falls, New York<LOVECANAL>|NON
+15. Onetime Charmin spokes-grocer<MRWHIPPLE>|JDN
+16. Besides<OTHERTHAN>|FRI
+17. Piebald equine<PINTOPONY>|NON
+18. The American or the National<BIGLEAGUE>|010
+19. Common cheese in Italian subs<PROVOLONE>|WED
+20. Part of mRNA<MESSENGER>|NON
+21. One might take you in<CONARTIST>|JDN
+22. Talk show appearance, e.g.<GUESTSPOT>|015
+23. World War II, colloquially<THEBIGONE>|JDN
+24. __ Moriarty (Holmes nemesis)<PROFESSOR>|NY1
+25. Print source<FINGERTIP>|JDN
+26. "Wolf" criers<ALARMISTS>|WED
+27. Trig finals, e.g.<MATHEXAMS>|010
+28. Buttress<REINFORCE>|FRI
+29. Hockey showdown, familiarly<CUPFINALS>|WED
+30. Folk music scholar who helped popularize Woody Guthrie and Muddy Waters<ALANLOMAX>|FRI
+31. Softens by soaking<MACERATES>|NON
+32. Oscar winner after "Rocky"<ANNIEHALL>|FRI
+ATE  DDR  HAL  ION  NLO  ONY  RDE  RMI  RMV  RRI  SCU  SSS  STC  THE
+`},
+          {
+            id: 23,
+            data: `
+WFREAKSHO|FREAKSHOW
+BASETOUCH|TOUCHBASE
+YREPUTABL|REPUTABLY
+OHSHTRAEE|EARTHSHOE
+HCUPMAKAE|KAMPUCHEA
+LBATSPOTE|TABLETOPS
+DEBOTSTUP|PUTSTOBED
+RTHEANSWE|THEANSWER
+AMPDOWNCL|CLAMPDOWN
+PSTANKCOR|TANKCORPS
+STOOFDEEP|FOOTSPEED
+EWSEDIRTE|SWEETRIDE
+LCNUYLNAE|UNCLEANLY
+ROCCANWOD|OWNACCORD
+PEEDELKNA|ANKLEDEEP
+CUSFORDFO|FORDFOCUS
+IDESSERPM|IMPRESSED
+LYUNUSUAL|UNUSUALLY
+NACSURTES|ETRUSCANS
+LEDREKIND|REKINDLED
+ROFHTROWT|FORTWORTH
+LAUNDRESS|LAUNDRESS
+SETTLESUN|UNSETTLES
+DNIWSFRUS|WINDSURFS
+TWODECKER|TWODECKER
+RDNOSEDHA|HARDNOSED
+ELTIESCRU|CRUELTIES
+FSWORTNOR|FRONTROWS
+CEDISATSA|CASTASIDE
+URCETHESO|THESOURCE
+RONHORSEI|IRONHORSE
+ASTSPOTRO|POTROASTS
+1. Circus attraction<FREAKSHOW>|JDN
+2. Check in (with)<TOUCHBASE>|NON
+3. In a well-respected manner<REPUTABLY>|NON
+4. Footwear with "negative heel technology"<EARTHSHOE>|NON
+5. Former name of Cambodia<KAMPUCHEA>|JDN
+6. Restaurant surfaces<TABLETOPS>|JDN
+7. Tucks in<PUTSTOBED>|NON
+8. Nickname of basketball's Allen Iverson<THEANSWER>|NY1
+9. Hold in a vise<CLAMPDOWN>|NON
+10. Army group<TANKCORPS>|JDN
+11. Sprinter's asset<FOOTSPEED>|JDN
+12. "Nice car!"<SWEETRIDE>|JDN
+13. In an impure way<UNCLEANLY>|NON
+14. Of my __ (voluntarily)<OWNACCORD>|NON
+15. Like the water in inflatable kiddie pools, typically<ANKLEDEEP>|FRI
+16. Compact car from 1998 to 2025<FORDFOCUS>|NON
+17. Dazzled (by)<IMPRESSED>|NON
+18. Not typically<UNUSUALLY>|NY1
+19. Dwellers in ancient Tuscany<ETRUSCANS>|NY0
+20. Brought back a flame<REKINDLED>|NON
+21. Home of the Star-Telegram<FORTWORTH>|NY0
+22. Washerwoman<LAUNDRESS>|NON
+23. Shakes<UNSETTLES>|FRI
+24. Uses a sailboard<WINDSURFS>|NY0
+25. Warship with twin rows of guns<TWODECKER>|JDN
+26. Unsentimental<HARDNOSED>|JDN
+27. Examples of sadistic treatment<CRUELTIES>|JDN
+28. Prized spots for prizefights<FRONTROWS>|NON
+29. Rejected<CASTASIDE>|FRI
+30. Go straight to __<THESOURCE>|NY0
+31. Locomotive nickname<IRONHORSE>|JDN
+32. Big Sunday dinners, maybe<POTROASTS>|NY0
+ASI  BAS  BED  CUS  DHA  EEA  ETH  ETR  HOR  MPR  RTH  SPO  WFR  YRE
+`},
+          {
+            id: 24,
+            data: `
+XROFEVLOS|SOLVEFORX
+MICROCHIP|MICROCHIP
+IYCARCOID|IDIOCRACY
+SOLEARYMR|MRSOLEARY
+PIHSREVEF|SHIPFEVER
+DIONACCOR|ACCORDION
+NBERRYCRA|CRANBERRY
+RAETNEPOS|TEARSOPEN
+ERSFINISH|FINISHERS
+CANEMDERE|REDMENACE
+YRRABEROM|BARRYMORE
+SOPHTAMRE|MATHPOSER
+HSIXTEENT|SIXTEENTH
+ERECNANIF|REFINANCE
+MORIZEDME|MEMORIZED
+VAFSNAEBA|FAVABEANS
+ATHOMENOT|NOTATHOME
+ETXENOISN|EXTENSION
+ANCEDALLI|DALLIANCE
+EZIRYTRAM|MARTYRIZE
+ANSTCAEVI|ACTSNAIVE
+NSIMSREMO|MISNOMERS
+ILLTIPONE|TIPONEILL
+MARMALADE|MARMALADE
+IVERCITYR|RIVERCITY
+RSMETAPHO|METAPHORS
+PITKCARTS|TRACKTIPS
+LAMABADIS|ISLAMABAD
+ICRIMEANT|ANTICRIME
+STRUNCATE|TRUNCATES
+SIDESBACK|BACKSIDES
+TNASYBABA|SANTABABY
+1. Frequent problem faced by algebra students<SOLVEFORX>|NY1
+2. Pet identification aid<MICROCHIP>|015
+3. 2006 Mike Judge dystopian dark comedy<IDIOCRACY>|JDN
+4. Noted 19th century scapegoat<MRSOLEARY>|FRI
+5. Old name for typhus<SHIPFEVER>|NON
+6. Polka instrument<ACCORDION>|JDN
+7. Thanksgiving fruit<CRANBERRY>|NON
+8. Unwraps in a hurry<TEARSOPEN>|NY0
+9. Ones applying gel stain<FINISHERS>|NON
+10. Communism, to McCarthy<REDMENACE>|NON
+11. Lionel or Drew<BARRYMORE>|NON
+12. Numerical puzzle<MATHPOSER>|NON
+13. .0625<SIXTEENTH>|NON
+14. Get a new mortgage<REFINANCE>|NON
+15. Learned by rote<MEMORIZED>|NON
+16. Hannibal Lecter ate them<FAVABEANS>|WED
+17. Out<NOTATHOME>|NY0
+18. File name add-on<EXTENSION>|015
+19. Hanky-panky<DALLIANCE>|FRI
+20. Put to death for a belief<MARTYRIZE>|NON
+21. Feigns innocence<ACTSNAIVE>|015
+22. Spurious appellations<MISNOMERS>|JDN
+23. Democratic speaker of the house from 1977 to 1987<TIPONEILL>|NON
+24. Tea tray spread<MARMALADE>|FRI
+25. Setting for "The Music Man"<RIVERCITY>|NON
+26. They're sometimes mixed<METAPHORS>|NY1
+27. Tout's offering?<TRACKTIPS>|FRI
+28. Home of the Shah Faisal Mosque<ISLAMABAD>|FRI
+29. Describing the efforts of Batman and Spider-Man<ANTICRIME>|JDN
+30. Shortens<TRUNCATES>|NON
+31. Posteriors<BACKSIDES>|WED
+32. Holiday song first popularized by Eartha Kitt<SANTABABY>|015
+ACT  BYS  CYI  ERM  ESB  FAV  IME  MIC  NBE  NOT  ORX  PHO  UNC  YMR
+`}
+    ];
+
+    const canvas = document.getElementById('puzzleCanvas');
+    const ctx = canvas.getContext('2d');
+    const cluesTarget = document.getElementById('clues-target');
+    const puzzleSelect = document.getElementById('puzzle-select');
+    const checkBtn = document.getElementById('check-btn');
+    const revealBtn = document.getElementById('reveal-btn');
+    const resetBtn = document.getElementById('reset-btn');
+    const triosBar = document.getElementById('trios-bar');
+    
+    const instructionsBtn = document.getElementById('instructions-btn');
+    const instructionsOverlay = document.getElementById('instructions-overlay');
+    const celebrationOverlay = document.getElementById('celebration-overlay');
+
+    const rad = 46; 
+    const s3 = Math.sqrt(3);
+    const radd = 1.15 * rad;
+    const r3 = rad * s3;
+
+    // Custom geometry overrides
+    const originX = 272;
+    const originY = 142;
+    const globalScale = 0.51;
+
+    const textFontSize = 16.5;
+    const verticalNudge = -8; 
+
+    let collectedBlanks = []; 
+    let selectedBlank = null;
+    let currentDrawingNonet = 0; 
+    let isLayoutCompiled = false;
+    let isCheckingActive = false;
+    let isRevealedActive = false;
+    
+    let currentPuzzleId = 1;
+    let dires = []; 
+    let cluesList = [];
+    let solutionLetters = []; 
+    let activeTrackingNonetId = null;
+
+    const xu = [0.86, 1.72, 2.58, 1.72, 0, -1.72, -2.58, -1.72, -0.86];
+    const yu = [2.5, 0.95, -0.55, -2.1, -2.1, -2.1, -0.55, 0.95, 2.5];
+
+    const xd = [-1.72, 0, 1.72, 2.58, 1.72, 0.86, -0.86, -1.72, -2.58];
+    const yd = [2, 2, 2, 0.45, -1, -2.55, -2.55, -1, 0.45];
+
+    function loadPuzzleData(puzzleObj) {
+        currentPuzzleId = puzzleObj.id;
+        dires = []; cluesList = []; solutionLetters = [];
+        isCheckingActive = false; isRevealedActive = false;
+        checkBtn.classList.remove('active'); checkBtn.innerText = "Check Puzzle";
+        revealBtn.classList.remove('active'); revealBtn.innerText = "Reveal Answers";
+        
+        const lines = puzzleObj.data.trim().split('\n');
+        for (let i = 0; i < 32; i++) {
+            const [scrambled, solved] = lines[i].split('|');
+            solutionLetters.push(scrambled.split(''));
+            
+            // Dynamic rotation algorithm setup
+            let doubledScrambled = scrambled + scrambled;
+            if (doubledScrambled.includes(solved)) {
+                dires.push(0); // Clockwise
+            } else {
+                dires.push(1); // Counter-Clockwise
+            }
+        }
+
+        for (let i = 32; i < 64; i++) {
+            const line = lines[i];
+            cluesList.push(line.substring(line.indexOf('.') + 1, line.indexOf('<')).trim());
+        }
+
+        buildTriosInterface(lines[64] || "");
+
+        collectedBlanks = []; selectedBlank = null; activeTrackingNonetId = null; isLayoutCompiled = false;
+        cluesTarget.innerHTML = 'Click or touch a box on the grid above to view clues.';
+        
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.save(); ctx.translate(originX, originY); ctx.scale(globalScale, -globalScale);
+        drawDiagram();
+        isLayoutCompiled = true;
+        ctx.restore();
+
+        loadProgress();
+        render();
+    }
+
+    function buildTriosInterface(triosLine) {
+        triosBar.innerHTML = "";
+        if (!triosLine.trim()) return;
+
+        const trios = triosLine.trim().split(/\s+/);
+        trios.forEach(trioText => {
+            const span = document.createElement('span');
+            span.className = 'trio-item';
+            span.innerText = trioText;
+            
+            span.addEventListener('click', function() {
+                span.classList.toggle('marked');
+                saveProgress();
+            });
+            
+            triosBar.appendChild(span);
+        });
+    }
+
+    function saveProgress() {
+        const gridValues = collectedBlanks.map(b => b.value);
+        const markedTrios = [];
+        document.querySelectorAll('.trio-item').forEach((span, idx) => {
+            if (span.classList.contains('marked')) markedTrios.push(idx);
+        });
+
+        const statePayload = {
+            grid: gridValues,
+            trios: markedTrios
+        };
+        localStorage.setItem(`theWholeNine_puzzle_${currentPuzzleId}`, JSON.stringify(statePayload));
+    }
+
+    function loadProgress() {
+        const cached = localStorage.getItem(`theWholeNine_puzzle_${currentPuzzleId}`);
+        if (!cached) return;
+        try {
+            const statePayload = JSON.parse(cached);
+            if (statePayload.grid && statePayload.grid.length === collectedBlanks.length) {
+                collectedBlanks.forEach((b, i) => b.value = statePayload.grid[i] || "");
+            }
+            if (statePayload.trios) {
+                const spans = document.querySelectorAll('.trio-item');
+                statePayload.trios.forEach(idx => {
+                    if (spans[idx]) spans[idx].classList.add('marked');
+                });
+            }
+        } catch(e) {
+            console.error("Error loading profile configuration save metrics.", e);
+        }
+    }
+
+    function checkVictoryCondition() {
+        if (collectedBlanks.length === 0) return;
+        
+        let parsedAllCorrect = collectedBlanks.every(b => {
+            if (!b.value) return false;
+            return b.nonetMappings.every(m => solutionLetters[m.nonetId - 1][m.localIdx] === b.value);
+        });
+
+        if (parsedAllCorrect) {
+            celebrationOverlay.style.display = 'flex';
+        }
+    }
+
+    function logNonetWordLocations(isDown) {
+        if (isLayoutCompiled) return;
+
+        for (let i = 0; i < 9; i++) {
+            let localX = isDown ? xd[i] * rad : xu[i] * rad;
+            let localY = isDown ? yd[i] * rad : yu[i] * rad;
+
+            let m = ctx.getTransform();
+            let globalX = localX * m.a + localY * m.c + m.e;
+            let globalY = localX * m.b + localY * m.d + m.f;
+
+            const precision = 7.0; 
+            let duplicate = collectedBlanks.find(b => Math.hypot(b.canvasX - globalX, b.canvasY - globalY) < precision);
+
+            if (!duplicate) {
+                collectedBlanks.push({
+                    id: collectedBlanks.length + 1,
+                    canvasX: globalX,
+                    canvasY: globalY,
+                    nonetMappings: [{ nonetId: currentDrawingNonet, localIdx: i }],
+                    value: ""
+                });
+            } else {
+                let alreadyMapped = duplicate.nonetMappings.some(m => m.nonetId === currentDrawingNonet);
+                if (!alreadyMapped) {
+                    duplicate.nonetMappings.push({ nonetId: currentDrawingNonet, localIdx: i });
+                }
+            }
+        }
+    }
+
+    function hex1() {
+        ctx.save(); ctx.translate(0, rad); 
+        ctx.beginPath(); ctx.moveTo(0, 0);
+        ctx.lineTo(r3 * 0.5, -rad * 0.5); ctx.lineTo(r3 * 0.5, -rad * 0.5 - rad);
+        ctx.lineTo(0, -rad * 2); ctx.lineTo(-rad, -rad * 2); ctx.lineTo(-rad, 0);
+        ctx.closePath(); ctx.fillStyle = "#ffffff"; ctx.fill(); ctx.stroke(); ctx.restore();
+    }
+
+    function hex2() {
+        ctx.save(); ctx.translate(r3 / 2, rad); 
+        ctx.beginPath(); ctx.moveTo(0, 0);
+        ctx.lineTo(0, -2 * rad); ctx.lineTo(-r3, -2 * rad); ctx.lineTo(-r3, 0);
+        ctx.closePath(); ctx.fillStyle = "#ffffff"; ctx.fill(); ctx.stroke(); ctx.restore();
+    }
+
+    function hex3() {
+        ctx.save(); ctx.translate(r3 / 2, rad); 
+        ctx.beginPath(); ctx.moveTo(0, 0);
+        ctx.lineTo(0, -2 * rad); ctx.lineTo(-rad, -2 * rad);
+        ctx.lineTo(-rad - r3 * 0.5, -2 * rad + rad * 0.5); ctx.lineTo(-rad - r3 * 0.5, -rad + rad * 0.5);
+        ctx.lineTo(-rad, 0); ctx.closePath(); ctx.fillStyle = "#ffffff"; ctx.fill(); ctx.stroke(); ctx.restore();
+    }
+
+    function hexline() {
+        ctx.save(); ctx.translate(4, 0); hex3(); ctx.translate(r3, 0); hex2(); ctx.translate(r3, 0); hex1(); ctx.restore();
+    }
+
+    function cloudup() {
+        ctx.save(); ctx.translate(-r3 + 11, 6); ctx.beginPath(); ctx.moveTo(0,0);
+        for (let i = 0; i < 2; i++) { ctx.lineTo(r3 * 4 - 20, 0); ctx.translate(r3 * 4 - 20, 0); ctx.rotate(120 * Math.PI / 180); }
+        ctx.closePath(); ctx.fillStyle = "#e6e6e6"; ctx.fill(); ctx.stroke(); ctx.restore();
+        ctx.save(); for (let i = 0; i < 3; i++) { hexline(); ctx.translate(2.5 * s3 * rad, 1.5 * rad); ctx.rotate(120 * Math.PI / 180); } ctx.restore();
+    }
+
+    function cloudup2() {
+        ctx.save(); ctx.translate(-r3 + 11, 6); ctx.beginPath(); ctx.moveTo(0,0);
+        for (let i = 0; i < 2; i++) { ctx.lineTo(r3 * 4 - 20, 0); ctx.translate(r3 * 4 - 20, 0); ctx.rotate(120 * Math.PI / 180); }
+        ctx.closePath(); ctx.fillStyle = "#bfbfbf"; ctx.fill(); ctx.stroke(); ctx.restore();
+        ctx.save(); for (let i = 0; i < 3; i++) { hexline(); ctx.translate(2.5 * s3 * rad, 1.5 * rad); ctx.rotate(120 * Math.PI / 180); } ctx.restore();
+    }
+
+    function clouddown() {
+        ctx.save(); ctx.rotate(60 * Math.PI / 180); cloudup2(); ctx.restore();
+    }
+
+    function clock() {
+        ctx.lineWidth = 2.5; let arcRadius = 0.66 * radd;
+        ctx.beginPath(); ctx.arc(0, 0, arcRadius, -70 * Math.PI / 180, 250 * Math.PI / 180, false); ctx.stroke();
+        ctx.save(); ctx.translate(-.2 * arcRadius, -1 * arcRadius); ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(-8, 16); ctx.lineTo(-18, 0); ctx.closePath(); ctx.fillStyle = ctx.strokeStyle; ctx.fill(); ctx.restore();
+    }
+
+    function cclock() {
+        ctx.lineWidth = 2.5; let arcRadius = 0.66 * radd;
+        ctx.beginPath(); ctx.arc(0, 0, arcRadius, -70 * Math.PI / 180, 250 * Math.PI / 180, false); ctx.stroke();
+        ctx.save(); ctx.translate(.2 * arcRadius, -1 * arcRadius); ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(8, 16); ctx.lineTo(18, 0); ctx.closePath(); ctx.fillStyle = ctx.strokeStyle; ctx.fill(); ctx.restore();
+    }
+
+    function drawDiagram() {
+        ctx.lineWidth = 2.5; ctx.lineJoin = 'round'; ctx.strokeStyle = '#000000';
+        currentDrawingNonet = 0;
+
+        function drawRow(count, isDown) {
+            ctx.save();
+            for (let i = 0; i < count; i++) {
+                currentDrawingNonet++;
+                if (isDown) { 
+                    clouddown(); 
+                    ctx.save(); ctx.translate(-0.5 * r3, 2.1 * rad); logNonetWordLocations(true); drawNumberOverlay(); ctx.restore();
+                } else { 
+                    cloudup(); 
+                    ctx.save(); ctx.translate(1 * r3, 1.6 * rad); logNonetWordLocations(false); drawNumberOverlay(); ctx.restore();
+                }
+                ctx.translate(4 * r3, 0);
+            }
+            ctx.restore();
+        }
+
+        drawRow(3, true);  ctx.translate(-3.5 * r3, -1.5 * rad);
+        drawRow(4, false); ctx.translate(1.5 * r3, -4.5 * rad);
+        drawRow(4, true);  ctx.translate(-3.5 * r3, -1.5 * rad);
+        drawRow(5, false); ctx.translate(1.5 * r3, -4.5 * rad);
+        drawRow(5, true);  ctx.translate(0.5 * r3, -1.5 * rad);
+        drawRow(4, false); ctx.translate(1.5 * r3, -4.5 * rad);
+        drawRow(4, true);  ctx.translate(0.5 * r3, -1.5 * rad);
+        drawRow(3, false);
+
+        function drawNumberOverlay() {
+            if (dires.length === 0) return; 
+            ctx.save(); ctx.scale(1, -1); ctx.save(); ctx.translate(0, -0.3 * rad);
+            if (dires[currentDrawingNonet - 1] === 0) clock(); else cclock();
+            ctx.restore(); ctx.font = `bold ${0.9 * rad}px Helvetica`; ctx.fillStyle = "#000000";
+            let metrics = ctx.measureText(currentDrawingNonet.toString()); ctx.fillText(currentDrawingNonet.toString(), -metrics.width / 2, 0.15 * rad); ctx.restore();
+        }
+    }
+
+    function render() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        ctx.save(); ctx.translate(originX, originY); ctx.scale(globalScale, -globalScale);
+
+        drawDiagram();
+        isLayoutCompiled = true; 
+        ctx.restore(); 
+
+        collectedBlanks.forEach(b => {
+            ctx.save(); ctx.translate(b.canvasX, b.canvasY + verticalNudge);
+            
+            if (selectedBlank === b) {
+                ctx.strokeStyle = "#e74c3c"; ctx.lineWidth = 2.5; ctx.strokeRect(-10, -10, 20, 20);
+                if (Math.floor(Date.now() / 400) % 2 === 0 && !b.value) {
+                    ctx.beginPath(); ctx.moveTo(-4, -7); ctx.lineTo(-4, 7); ctx.strokeStyle = "#e74c3c"; ctx.lineWidth = 2; ctx.stroke();
+                }
+            }
+            
+            if (b.value) {
+                ctx.font = `bold ${textFontSize}px Helvetica`; ctx.fillStyle = "#2c3e50";
+                let m = ctx.measureText(b.value); ctx.fillText(b.value, -m.width / 2, 5);
+
+                if (isCheckingActive) {
+                    let isCorrect = b.nonetMappings.every(m => solutionLetters[m.nonetId - 1][m.localIdx] === b.value);
+                    if (!isCorrect) {
+                        ctx.strokeStyle = "#f39c12"; ctx.lineWidth = 2.5;
+                        ctx.beginPath(); ctx.moveTo(7, -8); ctx.lineTo(-7, 10); ctx.stroke();
+                    }
+                }
+            }
+            ctx.restore();
+        });
+    }
+
+    function advanceCursor(currentBlank) {
+        if (!currentBlank || currentBlank.nonetMappings.length === 0) return;
+        
+        let targetRoute = currentBlank.nonetMappings.find(m => m.nonetId === activeTrackingNonetId) || currentBlank.nonetMappings[0];
+        activeTrackingNonetId = targetRoute.nonetId;
+        
+        let isCounterClockwise = (dires[activeTrackingNonetId - 1] === 1);
+        
+        let nextIdx;
+        if (isCounterClockwise) {
+            nextIdx = (targetRoute.localIdx - 1 + 9) % 9;
+        } else {
+            nextIdx = (targetRoute.localIdx + 1) % 9;
+        }
+
+        let nextBlank = collectedBlanks.find(b => b.nonetMappings.some(m => m.nonetId === activeTrackingNonetId && m.localIdx === nextIdx));
+        if (nextBlank) { 
+            selectedBlank = nextBlank; 
+            updateUIForSelectedBlank(nextBlank); 
+        }
+    }
+
+    function updateUIForSelectedBlank(blank) {
+        let sortedMappings = [...blank.nonetMappings].sort((a, b) => a.nonetId - b.nonetId);
+        if (!activeTrackingNonetId || !blank.nonetMappings.some(m => m.nonetId === activeTrackingNonetId)) {
+            activeTrackingNonetId = sortedMappings[0].nonetId;
+        }
+
+        cluesTarget.innerHTML = '';
+        sortedMappings.forEach(m => {
+            const clueDiv = document.createElement('div'); clueDiv.className = 'context-clue';
+            clueDiv.innerHTML = `<span class="nonet-label">#${m.nonetId}:</span> ${cluesList[m.nonetId - 1]}`;
+            cluesTarget.appendChild(clueDiv);
+        });
+    }
+
+    function dismissOverlays() {
+        instructionsOverlay.style.display = 'none';
+        celebrationOverlay.style.display = 'none';
+    }
+
+    instructionsOverlay.addEventListener('click', dismissOverlays);
+    instructionsOverlay.addEventListener('touchstart', dismissOverlays);
+    celebrationOverlay.addEventListener('click', dismissOverlays);
+    celebrationOverlay.addEventListener('touchstart', dismissOverlays);
+
+    canvas.addEventListener('click', function(e) {
+        const rect = canvas.getBoundingClientRect();
+        const clickX = (e.clientX - rect.left) * (canvas.width / rect.width);
+        const clickY = ((e.clientY - rect.top) * (canvas.height / rect.height)) - verticalNudge;
+        
+        let closest = null; let minDist = 16;
+        collectedBlanks.forEach(b => {
+            let d = Math.hypot(b.canvasX - clickX, b.canvasY - clickY);
+            if (d < minDist) { minDist = d; closest = b; }
+        });
+
+        if (closest) {
+            selectedBlank = closest; isCheckingActive = false;
+            checkBtn.innerText = "Check Puzzle"; checkBtn.classList.remove('active');
+            
+            closest.nonetMappings.sort((a, b) => a.nonetId - b.nonetId);
+            
+            if (closest.nonetMappings.length > 1) {
+                if (activeTrackingNonetId === closest.nonetMappings[0].nonetId) {
+                    activeTrackingNonetId = closest.nonetMappings[1].nonetId;
+                } else {
+                    activeTrackingNonetId = closest.nonetMappings[0].nonetId;
+                }
+            } else {
+                activeTrackingNonetId = closest.nonetMappings[0].nonetId;
+            }
+            
+            updateUIForSelectedBlank(closest);
+        } else {
+            selectedBlank = null; activeTrackingNonetId = null;
+            cluesTarget.innerHTML = 'Click or touch a box on the grid above to view clues.';
+        }
+        render();
+    });
+
+    window.addEventListener('keydown', function(e) {
+        if (instructionsOverlay.style.display === 'flex' || celebrationOverlay.style.display === 'flex') {
+            dismissOverlays();
+            e.preventDefault();
+            return;
+        }
+
+        if (!selectedBlank) return;
+        if (e.key.length === 1 && e.key.match(/[a-z]/i)) {
+            isCheckingActive = false; checkBtn.innerText = "Check Puzzle"; checkBtn.classList.remove('active');
+            selectedBlank.value = e.key.toUpperCase(); 
+            saveProgress();
+            checkVictoryCondition();
+            advanceCursor(selectedBlank); 
+            render();
+        } else if (e.key === "Backspace" || e.key === "Delete") {
+            isCheckingActive = false; selectedBlank.value = ""; 
+            saveProgress();
+            render();
+        }
+    });
+
+    document.getElementById('virtual-keyboard').addEventListener('click', function(e) {
+        if (!selectedBlank || !e.target.classList.contains('key')) return;
+        
+        isCheckingActive = false; 
+        checkBtn.innerText = "Check Puzzle"; 
+        checkBtn.classList.remove('active');
+
+        const keyText = e.target.innerText;
+
+        if (e.target.id === 'key-bksp' || e.target.id === 'key-del') {
+            selectedBlank.value = "";
+            saveProgress();
+            render();
+        } else if (keyText.length === 1 && keyText.match(/[A-Z]/)) {
+            selectedBlank.value = keyText;
+            saveProgress();
+            checkVictoryCondition();
+            advanceCursor(selectedBlank);
+            render();
+        }
+    });
+
+    instructionsBtn.addEventListener('click', function() {
+        instructionsOverlay.style.display = 'flex';
+    });
+
+    checkBtn.addEventListener('click', function() {
+        isCheckingActive = !isCheckingActive;
+        checkBtn.innerText = isCheckingActive ? "Restore Puzzle" : "Check Puzzle";
+        checkBtn.classList.toggle('active', isCheckingActive); render();
+    });
+
+    revealBtn.addEventListener('click', function() {
+        isRevealedActive = !isRevealedActive;
+        if (isRevealedActive) {
+            revealBtn.innerText = "Hide Answers"; revealBtn.classList.add('active');
+            collectedBlanks.forEach(b => {
+                let map = b.nonetMappings[0];
+                b.value = solutionLetters[map.nonetId - 1][map.localIdx];
+            });
+        } else {
+            revealBtn.innerText = "Reveal Answers"; revealBtn.classList.remove('active');
+            collectedBlanks.forEach(b => b.value = "");
+            selectedBlank = null; activeTrackingNonetId = null;
+            cluesTarget.innerHTML = 'Click or touch a box on the grid above to view clues.';
+            loadProgress(); 
+        }
+        isCheckingActive = false; checkBtn.innerText = "Check Puzzle"; checkBtn.classList.remove('active');
+        render();
+    });
+
+    resetBtn.addEventListener('click', function() {
+        if (!confirm("Are you sure you want to completely reset this puzzle and clear your saved progress?")) return;
+        
+        collectedBlanks.forEach(b => b.value = "");
+        selectedBlank = null; 
+        activeTrackingNonetId = null;
+        isCheckingActive = false;
+        isRevealedActive = false;
+        
+        checkBtn.innerText = "Check Puzzle"; checkBtn.classList.remove('active');
+        revealBtn.innerText = "Reveal Answers"; revealBtn.classList.remove('active');
+        cluesTarget.innerHTML = 'Click or touch a box on the grid above to view clues.';
+        
+        document.querySelectorAll('.trio-item').forEach(span => span.classList.remove('marked'));
+        
+        localStorage.removeItem(`theWholeNine_puzzle_${currentPuzzleId}`);
+        render();
+    });
+
+    function init() {
+        myPuzzleLibrary.forEach(p => {
+            const opt = document.createElement('option'); opt.value = p.id; opt.innerText = `Puzzle ${p.id}`;
+            puzzleSelect.appendChild(opt);
+        });
+        puzzleSelect.addEventListener('change', (e) => {
+            const selected = myPuzzleLibrary.find(p => p.id == e.target.value);
+            if (selected) loadPuzzleData(selected);
+        });
+        loadPuzzleData(myPuzzleLibrary[0]);
+    }
+
+    setInterval(() => { if (selectedBlank) render(); }, 200);
+    init();
+</script>
+</body>
+</html>
